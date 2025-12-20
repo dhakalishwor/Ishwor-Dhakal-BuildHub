@@ -1,7 +1,6 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import React from "react";
-
+import api from "../../API/axios";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -9,41 +8,110 @@ const Login = () => {
   const [formData, setFormData] = useState({
     username: "",
     password: "",
+    role: "client", // ✅ add role dropdown
   });
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
+    setError("");
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
     });
   };
 
+  const extractErrorMessage = (err) => {
+    const data = err?.response?.data;
+
+    if (!data) return "Login failed. Please try again.";
+    if (typeof data === "string") return data;
+    if (data.detail) return data.detail;
+
+    // some APIs return {"non_field_errors": ["..."]}
+    if (Array.isArray(data.non_field_errors) && data.non_field_errors.length > 0) {
+      return data.non_field_errors[0];
+    }
+
+    // fallback: first field error
+    const firstKey = Object.keys(data)[0];
+    const firstVal = data[firstKey];
+
+    if (Array.isArray(firstVal) && firstVal.length > 0) return firstVal[0];
+    if (typeof firstVal === "string") return firstVal;
+
+    return "Invalid credentials or role.";
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
+
+    try {
+      const res = await api.post("/auth/login/", {
+        username: formData.username.trim(),
+        password: formData.password,
+        role: formData.role, // ✅ send role to backend
+      });
+
+      // ✅ save tokens
+      localStorage.setItem("accessToken", res.data.access);
+      localStorage.setItem("refreshToken", res.data.refresh);
+
+      // ✅ Role-based redirect
+      const role = res?.data?.user?.role || formData.role;
+
+      if (formData.role === "admin") {
+        navigate("/admin/dashboard");
+      } else if (role === "client") {
+        navigate("/client/dashboard");
+      } else if (role === "contractor") {
+        navigate("/contractor/dashboard");
+      } else if (role === "worker") {
+        navigate("/worker/dashboard");
+      } else {
+        navigate("/"); // fallback
+      }
+    } catch (err) {
+      setError(extractErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-8">
-        
         <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">
           BuildHub Login
         </h2>
 
-        {error && (
-          <p className="text-red-500 text-sm text-center mb-4">
-            {error}
-          </p>
-        )}
+        {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          
-          {/* Username Section */}
+          {/* Role */}
+          <div>
+            <label className="block text-gray-700 mb-1">Login As</label>
+            <select
+              name="role"
+              value={formData.role}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="client">Client</option>
+              <option value="contractor">Contractor</option>
+              <option value="worker">Worker</option>
+              <option value="admin">Admin</option>
+            </select>
+
+            <p className="text-xs text-gray-500 mt-1">
+              Select the same role you registered with.
+            </p>
+          </div>
+
+          {/* Username */}
           <div>
             <label className="block text-gray-700 mb-1">Username</label>
             <input
@@ -57,7 +125,7 @@ const Login = () => {
             />
           </div>
 
-          {/* Password Section*/}
+          {/* Password */}
           <div>
             <label className="block text-gray-700 mb-1">Password</label>
             <input
@@ -71,13 +139,13 @@ const Login = () => {
             />
           </div>
 
-          {/*Login Button */}
+          {/* Login Button */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-800 transition"
+            className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-800 transition disabled:opacity-60"
           >
-            Login
+            {loading ? "Logging in..." : "Login"}
           </button>
         </form>
 

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import React from "react";
+import api from "../../API/axios";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -23,14 +23,73 @@ const Register = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const extractErrorMessage = (err) => {
+    const data = err?.response?.data;
+
+    if (!data) return "Registration failed. Please try again.";
+    if (typeof data === "string") return data;
+    if (data.detail) return data.detail;
+
+    const firstKey = Object.keys(data)[0];
+    const firstVal = data[firstKey];
+
+    if (Array.isArray(firstVal) && firstVal.length > 0) return firstVal[0];
+    if (typeof firstVal === "string") return firstVal;
+
+    return "Registration failed. Please check your inputs.";
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSuccess("");
-    setLoading(true);
-  };
 
-    
+    if (!["client", "contractor", "worker"].includes(formData.role)) {
+      setError("Invalid role selected.");
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await api.post("/auth/register/", {
+        username: formData.username.trim(),
+        email: formData.email.trim(),
+        role: formData.role,
+        password: formData.password,
+      });
+
+      setSuccess("Account created successfully!");
+
+      const user = res.data.user;
+      const requiresUpload = Boolean(res.data.requires_license_upload);
+
+      // ✅ STORE contractor_id for upload step
+      if (user.role === "contractor") {
+        localStorage.setItem(
+          "pendingContractorId",
+          String(user.id)
+        );
+      }
+
+      setTimeout(() => {
+        if (requiresUpload && user.role === "contractor") {
+          navigate("/contractor/upload-license");
+        } else {
+          navigate("/login");
+        }
+      }, 800);
+    } catch (err) {
+      setError(extractErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -39,7 +98,10 @@ const Register = () => {
           Create BuildHub Account
         </h2>
 
-        {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>}
+        {error && (
+          <p className="text-red-500 text-sm text-center mb-4">{error}</p>
+        )}
+
         {success && (
           <p className="text-green-600 text-sm text-center mb-4">{success}</p>
         )}
@@ -85,8 +147,11 @@ const Register = () => {
               <option value="client">Client</option>
               <option value="contractor">Contractor</option>
               <option value="worker">Worker</option>
-              <option value="admin">Admin</option>
             </select>
+
+            <p className="text-xs text-gray-500 mt-1">
+              Note: Contractors must upload a license after registration.
+            </p>
           </div>
 
           {/* Password */}
@@ -105,7 +170,9 @@ const Register = () => {
 
           {/* Confirm Password */}
           <div>
-            <label className="block text-gray-700 mb-1">Confirm Password</label>
+            <label className="block text-gray-700 mb-1">
+              Confirm Password
+            </label>
             <input
               type="password"
               name="confirmPassword"
@@ -127,7 +194,6 @@ const Register = () => {
           </button>
         </form>
 
-        {/* Login Link */}
         <p className="text-sm text-center text-gray-600 mt-4">
           Already have an account?{" "}
           <span
@@ -141,6 +207,5 @@ const Register = () => {
     </div>
   );
 };
-
 
 export default Register;
