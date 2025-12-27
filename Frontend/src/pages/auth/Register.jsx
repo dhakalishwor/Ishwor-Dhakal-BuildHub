@@ -69,7 +69,7 @@ const Register = () => {
       const user = res.data.user;
       const requiresUpload = Boolean(res.data.requires_license_upload);
 
-      // ✅ STORE contractor_id for upload step
+      // STORE contractor_id for upload step
       if (user.role === "contractor") {
         localStorage.setItem(
           "pendingContractorId",

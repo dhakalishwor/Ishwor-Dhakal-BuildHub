@@ -5,6 +5,10 @@ import Landing from "./assets/landing";
 import React from "react";
 import ClientDashboard from "./pages/dashboard/ClientDashboard";
 import UploadLicense from "./pages/auth/UploadLicense";
+import AdminDashboard from "./pages/dashboard/AdminDashboard";
+import PostProject from "./pages/client/PostProject";
+import ContractorDashboard from "./pages/dashboard/ContractorDashboard";
+import MyProjects from "./pages/client/MyProjects";
 function App() {
   return (
     <Routes>
@@ -12,7 +16,11 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path ="/clientdashboard" element={<ClientDashboard/>}/>
+      <Route path="/AdminDashboard" element={<AdminDashboard/>}/>
       <Route path="/contractor/upload-license" element={<UploadLicense />} />
+      <Route path="/client/postproject" element={<PostProject/>}/>
+      <Route path="/contractor" element={<ContractorDashboard />} />
+      <Route path="/client/projects" element={<MyProjects />} />
     </Routes>
   );
 }

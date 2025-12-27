@@ -44,7 +44,11 @@ class ContractorLicenseUploadSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("License document is required.")
         return file
 
-
+class ContractorLicenseUploadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContractorLicense
+        fields = ["license_document"]
+        
 class RoleBasedTokenObtainPairSerializer(TokenObtainPairSerializer):
     role = serializers.CharField(write_only=True)
 
@@ -64,7 +68,7 @@ class RoleBasedTokenObtainPairSerializer(TokenObtainPairSerializer):
             if user.role != selected_role:
                 raise serializers.ValidationError("Selected role does not match your account role.")
 
-            # ✅ Contractor must upload license before login
+            # Contractor must upload license before login
             if user.role == User.ROLE_CONTRACTOR and not hasattr(user, "contractor_license"):
                 raise serializers.ValidationError("Contractor license document not uploaded yet.")
 

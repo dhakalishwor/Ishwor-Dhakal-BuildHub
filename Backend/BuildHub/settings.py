@@ -11,7 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
-
+import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -31,7 +31,6 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    "Authentication",
     "drf_spectacular",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -39,10 +38,13 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-
     "rest_framework",
     "rest_framework_simplejwt",
     "corsheaders",
+    "Authentication",
+    "RecommendationSystem",
+    "ContractorManagement",
+
 ]
 
 
@@ -101,7 +103,7 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.AllowAny",
+        "rest_framework.permissions.IsAuthenticated",
     ),
 }
 
@@ -148,8 +150,20 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
 ]
+
+# OCR Configuration (optional)
+# If Tesseract OCR is not in your system PATH, uncomment and set the path:
+# TESSERACT_CMD = r"C:\Program Files\Tesseract-OCR\tesseract.exe"  # Windows example
+# TESSERACT_CMD = "/usr/bin/tesseract"  # Linux/Mac example
+
+# If Poppler (for PDF to image conversion) is not in your system PATH, uncomment and set:
+# POPPLER_PATH = r"C:\Program Files\poppler\bin"  # Windows example
+# POPPLER_PATH = "/usr/bin"  # Linux/Mac example
+
+# Note: If Tesseract is not installed, license uploads will still succeed but will be
+# marked as "UNDER_REVIEW" for manual verification instead of automatic OCR verification.

@@ -8,7 +8,7 @@ const Login = () => {
   const [formData, setFormData] = useState({
     username: "",
     password: "",
-    role: "client", // ✅ add role dropdown
+    role: "client",
   });
 
   const [error, setError] = useState("");
@@ -29,12 +29,12 @@ const Login = () => {
     if (typeof data === "string") return data;
     if (data.detail) return data.detail;
 
-    // some APIs return {"non_field_errors": ["..."]}
+
     if (Array.isArray(data.non_field_errors) && data.non_field_errors.length > 0) {
       return data.non_field_errors[0];
     }
 
-    // fallback: first field error
+  
     const firstKey = Object.keys(data)[0];
     const firstVal = data[firstKey];
 
@@ -53,22 +53,20 @@ const Login = () => {
       const res = await api.post("/auth/login/", {
         username: formData.username.trim(),
         password: formData.password,
-        role: formData.role, // ✅ send role to backend
+        role: formData.role,
       });
 
-      // ✅ save tokens
       localStorage.setItem("accessToken", res.data.access);
       localStorage.setItem("refreshToken", res.data.refresh);
 
-      // ✅ Role-based redirect
       const role = res?.data?.user?.role || formData.role;
 
       if (formData.role === "admin") {
         navigate("/admin/dashboard");
       } else if (role === "client") {
-        navigate("/client/dashboard");
+        navigate("/clientdashboard");
       } else if (role === "contractor") {
-        navigate("/contractor/dashboard");
+        navigate("/contractor");
       } else if (role === "worker") {
         navigate("/worker/dashboard");
       } else {

@@ -11,7 +11,7 @@ const UploadLicense = () => {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // 🔐 Ensure contractor_id exists (user came from register)
+  // Ensure contractor_id exists (user came from register)
   useEffect(() => {
     const id = localStorage.getItem("pendingContractorId");
     if (!id) {
@@ -43,7 +43,7 @@ const UploadLicense = () => {
     }
 
     const formData = new FormData();
-    formData.append("contractor_id", contractorId); // ✅ REQUIRED
+    formData.append("contractor_id", contractorId); // REQUIRED
     formData.append("license_document", licenseFile);
 
     setLoading(true);
@@ -57,7 +57,7 @@ const UploadLicense = () => {
 
       setSuccess("License uploaded successfully. Please login to continue.");
 
-      // 🧹 cleanup temporary ID
+      // cleanup temporary ID
       localStorage.removeItem("pendingContractorId");
 
       setTimeout(() => {
