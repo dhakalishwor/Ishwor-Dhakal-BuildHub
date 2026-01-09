@@ -9,6 +9,9 @@ import AdminDashboard from "./pages/dashboard/AdminDashboard";
 import PostProject from "./pages/client/PostProject";
 import ContractorDashboard from "./pages/dashboard/ContractorDashboard";
 import MyProjects from "./pages/client/MyProjects";
+import ProjectBids from "./pages/client/ProjectBids";
+import AvailableProjects from "./pages/Contractor/AvailableProjects";
+
 function App() {
   return (
     <Routes>
@@ -21,6 +24,9 @@ function App() {
       <Route path="/client/postproject" element={<PostProject/>}/>
       <Route path="/contractor" element={<ContractorDashboard />} />
       <Route path="/client/projects" element={<MyProjects />} />
+      <Route path="/client/myprojects" element={<MyProjects />} />
+      <Route path="/client/project-bids" element={<ProjectBids />} />
+      <Route path="/contractor/available-projects" element={<AvailableProjects />} />
     </Routes>
   );
 }

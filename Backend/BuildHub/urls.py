@@ -13,6 +13,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("auth/", include("Authentication.urls")),
     path("api/", include("RecommendationSystem.urls")),
+    path("api/", include("BiddingSystem.urls")),
     path("api/", include("ContractorManagement.urls")),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
@@ -25,6 +26,8 @@ urlpatterns = [
         SpectacularRedocView.as_view(url_name="schema"),
         name="redoc",
     ),
+
+
 ]
 
 if settings.DEBUG:

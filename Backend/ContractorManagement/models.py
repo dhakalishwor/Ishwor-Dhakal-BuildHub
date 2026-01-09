@@ -3,7 +3,6 @@ from django.conf import settings
 
 
 class Contractor(models.Model):
-    # ---------- CHOICES ----------
     CONTRACTOR_TYPE_INDIVIDUAL = "Individual"
     CONTRACTOR_TYPE_COMPANY = "Company"
     CONTRACTOR_TYPE_CHOICES = (
@@ -29,7 +28,6 @@ class Contractor(models.Model):
         (RATE_TYPE_PROJECT, "Project"),
     )
 
-    # ---------- FIELDS ----------
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,

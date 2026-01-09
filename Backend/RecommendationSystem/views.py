@@ -2,6 +2,7 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework import status
 
 from .models import Project
 from .serializers import ProjectSerializer
@@ -15,7 +16,14 @@ class ProjectViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Project.objects.filter(client=self.request.user).order_by("-created_at")
+        # If the user is a client, show their own projects
+        if getattr(self.request.user, "role", None) == "client":
+            return Project.objects.filter(client=self.request.user).order_by("-created_at")
+        # If the user is a contractor, show all projects with BIDDING status
+        elif getattr(self.request.user, "role", None) == "contractor":
+            return Project.objects.filter(status="BIDDING").order_by("-created_at")
+        # Default: empty queryset for other roles
+        return Project.objects.none()
 
     def _get_recommended_contractors(self, project: Project):
         category_label = dict(Project.CATEGORY_CHOICES).get(project.category)

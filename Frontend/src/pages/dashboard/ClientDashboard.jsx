@@ -77,6 +77,7 @@ export default function ClientDashboard() {
     { key: "dashboard", label: "Dashboard" },
     { key: "postproject", label: "Post Project", route: "/client/postproject" },
     { key: "my-projects", label: "My Projects", route: "/client/projects" },
+    { key: "project-bids", label: "Project Bids", route: "/client/project-bids" },
     { key: "messages", label: "Messages" },
     { key: "payments", label: "Payments" },
     { key: "profile", label: "Profile" },

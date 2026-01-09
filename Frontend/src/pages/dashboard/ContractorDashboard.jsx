@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import api from "../../API/axios";
+import AvailableProjects from "../Contractor/AvailableProjects";
+import MyBids from "../Contractor/MyBids";
+// import Messages from "./Messages"; // (optional later)
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(" ");
@@ -35,7 +38,7 @@ export default function ContractorDashboard() {
     return allProjectTypes.filter((t) => t.toLowerCase().includes(q));
   }, [searchType]);
 
-  //Load contractor profile
+  // Load contractor profile
   useEffect(() => {
     let mounted = true;
 
@@ -53,7 +56,9 @@ export default function ContractorDashboard() {
           address: data.address || "",
           projectTypes: Array.isArray(data.projectTypes) ? data.projectTypes : [],
           experienceYears:
-            data.experienceYears === 0 || data.experienceYears ? String(data.experienceYears) : "",
+            data.experienceYears === 0 || data.experienceYears
+              ? String(data.experienceYears)
+              : "",
         };
 
         setProfile(normalized);
@@ -61,9 +66,10 @@ export default function ContractorDashboard() {
       } catch (err) {
         if (!mounted) return;
         console.error("Contractor profile load error:", err);
+
         const status = err?.response?.status;
         let msg = "Failed to load contractor profile. Please login again and check token.";
-        
+
         if (status === 401) {
           msg = "Authentication failed. Please login again.";
         } else if (status === 403) {
@@ -75,7 +81,7 @@ export default function ContractorDashboard() {
         } else if (err?.message) {
           msg = err.message;
         }
-        
+
         setApiError(msg);
       } finally {
         if (mounted) setLoading(false);
@@ -121,8 +127,6 @@ export default function ContractorDashboard() {
   function validate(f) {
     const errors = [];
     if (!f.fullName.trim()) errors.push("Full Name is required.");
-    // email optional in your model, so not required
-    // experience should be a non-negative integer
     if (f.experienceYears !== "") {
       const n = Number(f.experienceYears);
       if (!Number.isInteger(n) || n < 0) errors.push("Experience must be a whole number (0 or more).");
@@ -197,8 +201,11 @@ export default function ContractorDashboard() {
             <button className="rounded-xl border px-4 py-2 text-sm hover:bg-slate-50">
               Notifications
             </button>
-            <button className="rounded-xl bg-emerald-900 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-950">
-              My Projects
+            <button
+              onClick={() => setActiveMenu("projects")}
+              className="rounded-xl bg-emerald-900 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-950"
+            >
+              Available Projects
             </button>
           </div>
         </div>
@@ -243,15 +250,13 @@ export default function ContractorDashboard() {
         <main className="bg-white">
           <div className="px-4 py-8 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-4xl">
-              {/* Profile Page */}
+              {/* PROFILE */}
               {activeMenu === "profile" && (
                 <>
                   <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
                     <div>
                       <h1 className="text-2xl font-bold text-emerald-900">Profile Management</h1>
-                      <p className="text-sm text-slate-600">
-                        Update your contractor profile details.
-                      </p>
+                      <p className="text-sm text-slate-600">Update your contractor profile details.</p>
                     </div>
 
                     {!editing ? (
@@ -375,7 +380,7 @@ export default function ContractorDashboard() {
                           />
                         </div>
 
-                        {/* Experience */}
+                        {/* Experience + Search */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                             <label className="text-sm font-medium text-slate-700">
@@ -460,14 +465,26 @@ export default function ContractorDashboard() {
                 </>
               )}
 
-              {/* Placeholder views for other menu items */}
-              {activeMenu !== "profile" && (
+              {/* AVAILABLE PROJECTS */}
+              {activeMenu === "projects" && (
+                <div className="rounded-2xl border bg-white p-4 shadow-sm">
+                  <AvailableProjects />
+                </div>
+              )}
+
+              {/* MY BIDS */}
+              {activeMenu === "bids" && (
+                <div className="rounded-2xl border bg-white shadow-sm">
+                  <MyBids />
+                </div>
+              )}
+
+              {/* MESSAGES (placeholder) */}
+              {activeMenu === "messages" && (
                 <div className="rounded-2xl border bg-white p-8 shadow-sm">
-                  <h2 className="text-xl font-bold text-emerald-900">
-                    {activeMenu.replace("-", " ").toUpperCase()}
-                  </h2>
+                  <h2 className="text-xl font-bold text-emerald-900">MESSAGES</h2>
                   <p className="mt-2 text-sm text-slate-600">
-                    UI is ready. We can connect this to Django later (projects, bids, messages).
+                    Next: connect messages system here.
                   </p>
                 </div>
               )}
