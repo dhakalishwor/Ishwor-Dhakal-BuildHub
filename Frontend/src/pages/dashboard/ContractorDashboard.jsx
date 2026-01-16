@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import api from "../../API/axios";
 import AvailableProjects from "../Contractor/AvailableProjects";
 import MyBids from "../Contractor/MyBids";
-// import Messages from "./Messages"; // (optional later)
+import MyRatings from "../Contractor/MyRatings";
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(" ");
@@ -14,6 +14,8 @@ const emptyProfile = {
   address: "",
   projectTypes: [],
   experienceYears: "",
+  avgRating: 0,
+  totalRatings: 0,
 };
 
 const allProjectTypes = ["Civil", "Electrical", "Plumbing", "Interior", "Painting", "Other"];
@@ -38,7 +40,6 @@ export default function ContractorDashboard() {
     return allProjectTypes.filter((t) => t.toLowerCase().includes(q));
   }, [searchType]);
 
-  // Load contractor profile
   useEffect(() => {
     let mounted = true;
 
@@ -56,9 +57,10 @@ export default function ContractorDashboard() {
           address: data.address || "",
           projectTypes: Array.isArray(data.projectTypes) ? data.projectTypes : [],
           experienceYears:
-            data.experienceYears === 0 || data.experienceYears
-              ? String(data.experienceYears)
-              : "",
+            data.experienceYears === 0 || data.experienceYears ? String(data.experienceYears) : "",
+          avgRating: typeof data.avgRating === "number" ? data.avgRating : Number(data.avgRating || 0),
+          totalRatings:
+            typeof data.totalRatings === "number" ? data.totalRatings : Number(data.totalRatings || 0),
         };
 
         setProfile(normalized);
@@ -73,7 +75,8 @@ export default function ContractorDashboard() {
         if (status === 401) {
           msg = "Authentication failed. Please login again.";
         } else if (status === 403) {
-          msg = err?.response?.data?.detail || "You don't have permission to access this resource.";
+          msg =
+            err?.response?.data?.detail || "You don't have permission to access this resource.";
         } else if (status === 500) {
           msg = "Server error. Please try again later.";
         } else if (err?.response?.data?.detail) {
@@ -165,6 +168,14 @@ export default function ContractorDashboard() {
         projectTypes: Array.isArray(data.projectTypes) ? data.projectTypes : payload.projectTypes,
         experienceYears:
           data.experienceYears === 0 || data.experienceYears ? String(data.experienceYears) : "0",
+        avgRating:
+          typeof data.avgRating === "number"
+            ? data.avgRating
+            : (profile.avgRating ?? 0),
+        totalRatings:
+          typeof data.totalRatings === "number"
+            ? data.totalRatings
+            : (profile.totalRatings ?? 0),
       };
 
       setProfile(normalized);
@@ -184,7 +195,6 @@ export default function ContractorDashboard() {
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
-      {/* Top Bar */}
       <header className="sticky top-0 z-10 border-b bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
@@ -212,7 +222,6 @@ export default function ContractorDashboard() {
       </header>
 
       <div className="mx-auto grid max-w-7xl grid-cols-1 md:grid-cols-[260px_1fr]">
-        {/* Sidebar */}
         <aside className="border-r bg-emerald-900 text-white">
           <div className="p-4">
             <p className="text-xs uppercase tracking-wider text-emerald-200">Contractor Menu</p>
@@ -221,6 +230,7 @@ export default function ContractorDashboard() {
               { key: "profile", label: "Manage Profile" },
               { key: "projects", label: "Available Projects" },
               { key: "bids", label: "My Bids" },
+              { key: "ratings", label: "Ratings" },
               { key: "messages", label: "Messages" },
             ].map((item) => (
               <button
@@ -246,17 +256,17 @@ export default function ContractorDashboard() {
           </div>
         </aside>
 
-        {/* Main */}
         <main className="bg-white">
           <div className="px-4 py-8 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-4xl">
-              {/* PROFILE */}
               {activeMenu === "profile" && (
                 <>
                   <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
                     <div>
                       <h1 className="text-2xl font-bold text-emerald-900">Profile Management</h1>
-                      <p className="text-sm text-slate-600">Update your contractor profile details.</p>
+                      <p className="text-sm text-slate-600">
+                        Update your contractor profile details.
+                      </p>
                     </div>
 
                     {!editing ? (
@@ -278,7 +288,6 @@ export default function ContractorDashboard() {
                     )}
                   </div>
 
-                  {/* Messages */}
                   <div className="mt-4 space-y-3">
                     {loading && (
                       <div className="rounded-xl border bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
@@ -299,7 +308,6 @@ export default function ContractorDashboard() {
                     )}
                   </div>
 
-                  {/* Profile Card */}
                   <section className="mt-4 rounded-2xl border bg-white shadow-sm overflow-hidden">
                     <div className="border-b px-6 py-4 flex items-center justify-between">
                       <div>
@@ -322,30 +330,44 @@ export default function ContractorDashboard() {
                           <p className="text-xs text-slate-500">Full Name</p>
                           <p className="mt-1 font-semibold">{profile.fullName || "-"}</p>
                         </div>
+
                         <div className="rounded-xl border p-4">
                           <p className="text-xs text-slate-500">Email</p>
                           <p className="mt-1 font-semibold">{profile.email || "-"}</p>
                         </div>
+
                         <div className="rounded-xl border p-4 md:col-span-2">
                           <p className="text-xs text-slate-500">Address</p>
                           <p className="mt-1 font-semibold">{profile.address || "-"}</p>
                         </div>
+
                         <div className="rounded-xl border p-4">
                           <p className="text-xs text-slate-500">Experience (Years)</p>
                           <p className="mt-1 font-semibold">
                             {profile.experienceYears !== "" ? profile.experienceYears : "-"}
                           </p>
                         </div>
+
                         <div className="rounded-xl border p-4">
                           <p className="text-xs text-slate-500">Type of Projects</p>
                           <p className="mt-1 font-semibold">
                             {profile.projectTypes?.length ? profile.projectTypes.join(", ") : "-"}
                           </p>
                         </div>
+
+                        <div className="rounded-xl border p-4 md:col-span-2">
+                          <p className="text-xs text-slate-500">Average Rating</p>
+                          <p className="mt-1 font-semibold">
+                            {Number(profile.avgRating || 0).toFixed(2)} / 5{" "}
+                            <span className="text-xs text-slate-500 font-normal">
+                              ({Number(profile.totalRatings || 0)} ratings)
+                            </span>
+                          </p>
+                          
+                        </div>
                       </div>
                     ) : (
                       <form onSubmit={saveProfile} className="p-6 space-y-4">
-                        {/* Name + Email */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                             <label className="text-sm font-medium text-slate-700">Full Name</label>
@@ -368,7 +390,6 @@ export default function ContractorDashboard() {
                           </div>
                         </div>
 
-                        {/* Address */}
                         <div>
                           <label className="text-sm font-medium text-slate-700">Address</label>
                           <input
@@ -380,7 +401,6 @@ export default function ContractorDashboard() {
                           />
                         </div>
 
-                        {/* Experience + Search */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                             <label className="text-sm font-medium text-slate-700">
@@ -408,11 +428,8 @@ export default function ContractorDashboard() {
                           </div>
                         </div>
 
-                        {/* Project Types chips */}
                         <div className="rounded-xl border p-4">
-                          <p className="text-sm font-medium text-slate-700">
-                            Choose your project types
-                          </p>
+                          <p className="text-sm font-medium text-slate-700">Choose your project types</p>
                           <div className="mt-3 flex flex-wrap gap-2">
                             {filteredTypes.map((type) => {
                               const selected = form.projectTypes.includes(type);
@@ -441,7 +458,6 @@ export default function ContractorDashboard() {
                           </p>
                         </div>
 
-                        {/* Actions */}
                         <div className="flex justify-end gap-3 pt-2">
                           <button
                             type="button"
@@ -465,26 +481,29 @@ export default function ContractorDashboard() {
                 </>
               )}
 
-              {/* AVAILABLE PROJECTS */}
               {activeMenu === "projects" && (
                 <div className="rounded-2xl border bg-white p-4 shadow-sm">
                   <AvailableProjects />
                 </div>
               )}
 
-              {/* MY BIDS */}
               {activeMenu === "bids" && (
                 <div className="rounded-2xl border bg-white shadow-sm">
                   <MyBids />
                 </div>
               )}
 
-              {/* MESSAGES (placeholder) */}
+              {activeMenu === "ratings" && (
+                <div className="rounded-2xl border bg-white p-4 shadow-sm">
+                  <MyRatings />
+                </div>
+              )}
+
               {activeMenu === "messages" && (
                 <div className="rounded-2xl border bg-white p-8 shadow-sm">
                   <h2 className="text-xl font-bold text-emerald-900">MESSAGES</h2>
                   <p className="mt-2 text-sm text-slate-600">
-                    Next: connect messages system here.
+                    this is message section.
                   </p>
                 </div>
               )}

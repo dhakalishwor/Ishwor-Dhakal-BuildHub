@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "RecommendationSystem",
     "ContractorManagement",
     "BiddingSystem",
+    "RatingSystem",
 ]
 
 

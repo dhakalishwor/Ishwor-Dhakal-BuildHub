@@ -16,7 +16,6 @@ class BidCreateSerializer(serializers.ModelSerializer):
 
         project = attrs.get("project")
 
-        # Optional: prevent bidding if project already assigned/closed
         if hasattr(project, "status") and project.status in ["CLOSED", "COMPLETED"]:
             raise serializers.ValidationError("This project is not open for bidding.")
 
@@ -40,7 +39,6 @@ class BidListSerializer(serializers.ModelSerializer):
         ]
 
     def get_contractor_name(self, obj):
-        # Adjust depending on your user fields
         return getattr(obj.contractor, "full_name", None) or obj.contractor.username
 
 

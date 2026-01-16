@@ -16,13 +16,14 @@ class ProjectViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # If the user is a client, show their own projects
-        if getattr(self.request.user, "role", None) == "client":
+        role = (getattr(self.request.user, "role", "") or "").upper()
+
+        if role == "CLIENT":
             return Project.objects.filter(client=self.request.user).order_by("-created_at")
-        # If the user is a contractor, show all projects with BIDDING status
-        elif getattr(self.request.user, "role", None) == "contractor":
+
+        if role == "CONTRACTOR":
             return Project.objects.filter(status="BIDDING").order_by("-created_at")
-        # Default: empty queryset for other roles
+
         return Project.objects.none()
 
     def _get_recommended_contractors(self, project: Project):
@@ -41,7 +42,6 @@ class ProjectViewSet(ModelViewSet):
 
         contractors, category_label = self._get_recommended_contractors(project)
 
-        # store for create() response
         self._recommended_contractors = contractors
         self._category_label = category_label
 
@@ -70,3 +70,25 @@ class ProjectViewSet(ModelViewSet):
                 "recommended": ContractorSerializer(contractors, many=True).data,
             }
         )
+
+    @action(detail=True, methods=["patch"], url_path="complete")
+    def complete_project(self, request, pk=None):
+        project = self.get_object()
+        role = (getattr(request.user, "role", "") or "").upper()
+
+        if role != "CLIENT":
+            return Response({"detail": "Only clients can complete projects."}, status=status.HTTP_403_FORBIDDEN)
+
+        if project.client_id != request.user.id:
+            return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
+
+        if project.status != "ACTIVE":
+            return Response({"detail": "Only ACTIVE projects can be completed."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if project.assigned_contractor_id is None:
+            return Response({"detail": "No contractor assigned to this project."}, status=status.HTTP_400_BAD_REQUEST)
+
+        project.status = "COMPLETED"
+        project.save()
+
+        return Response({"detail": "Project marked as completed."}, status=status.HTTP_200_OK)

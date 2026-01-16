@@ -12,18 +12,32 @@ export default function MyProjects() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [actionLoadingId, setActionLoadingId] = useState(null);
 
   async function loadProjects() {
     setLoading(true);
     setErr("");
     try {
       const res = await api.get("/api/projects/");
-      setProjects(res.data || []);
+      setProjects(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
       setErr(e?.response?.data?.detail || "Failed to load projects.");
       setProjects([]);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function markCompleted(projectId) {
+    setActionLoadingId(projectId);
+    try {
+      await api.patch(`/api/projects/${projectId}/complete/`);
+      await loadProjects();
+      alert("Project marked as completed!");
+    } catch (e) {
+      alert(e?.response?.data?.detail || "Failed to complete project.");
+    } finally {
+      setActionLoadingId(null);
     }
   }
 
@@ -33,7 +47,6 @@ export default function MyProjects() {
 
   return (
     <div className="min-h-screen grid grid-cols-[260px_1fr] bg-emerald-50">
-      {/* Sidebar */}
       <aside className="bg-emerald-900 text-white p-4">
         <h2 className="text-lg font-bold mb-6">Client Menu</h2>
 
@@ -52,7 +65,6 @@ export default function MyProjects() {
         </button>
       </aside>
 
-      {/* Main */}
       <main className="p-8">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between gap-3 mb-6">
@@ -66,7 +78,6 @@ export default function MyProjects() {
             </button>
           </div>
 
-          {/* Recommended Contractors */}
           {recommended.length > 0 && (
             <div className="mb-6 rounded-2xl border bg-emerald-100/60 p-5">
               <div className="flex items-start justify-between gap-3">
@@ -103,7 +114,6 @@ export default function MyProjects() {
             </div>
           )}
 
-          {/* Loading */}
           {loading && (
             <div className="bg-white p-6 rounded-xl shadow text-sm text-emerald-900">
               Loading projects...
@@ -116,7 +126,6 @@ export default function MyProjects() {
             </div>
           )}
 
-          {/* Projects list */}
           {!loading && !err && projects.length === 0 ? (
             <div className="bg-white p-6 rounded-xl shadow">
               No projects posted yet.
@@ -125,35 +134,55 @@ export default function MyProjects() {
             !loading &&
             !err && (
               <div className="grid gap-4">
-                {projects.map((p) => (
-                  <div
-                    key={p.id}
-                    className={[
-                      "bg-white rounded-xl shadow p-5 border",
-                      highlightId === p.id ? "ring-2 ring-emerald-300" : "",
-                    ].join(" ")}
-                  >
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <h3 className="font-semibold text-emerald-900">
-                          {p.title}
-                        </h3>
-                        <p className="text-sm text-slate-500">
-                          {p.category} • {p.location}
-                        </p>
+                {projects.map((p) => {
+                  const alreadyRated = !!p.rating;
+                  return (
+                    <div
+                      key={p.id}
+                      className={[
+                        "bg-white rounded-xl shadow p-5 border",
+                        highlightId === p.id ? "ring-2 ring-emerald-300" : "",
+                      ].join(" ")}
+                    >
+                      <div className="flex justify-between items-center gap-4">
+                        <div>
+                          <h3 className="font-semibold text-emerald-900">{p.title}</h3>
+                          <p className="text-sm text-slate-500">
+                            {p.category} • {p.location}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs px-3 py-1 rounded-full bg-emerald-100 text-emerald-900">
+                            {p.status}
+                          </span>
+
+                          {p.status === "ACTIVE" && (
+                            <button
+                              onClick={() => markCompleted(p.id)}
+                              disabled={actionLoadingId === p.id}
+                              className="rounded-lg bg-slate-800 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-900 disabled:opacity-60"
+                            >
+                              {actionLoadingId === p.id ? "Completing..." : "Mark Completed"}
+                            </button>
+                          )}
+
+                          {p.status === "COMPLETED" && alreadyRated && (
+                            <span className="text-xs px-3 py-1 rounded-full bg-emerald-50 text-emerald-900 border border-emerald-200">
+                              Already Rated
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <span className="text-xs px-3 py-1 rounded-full bg-emerald-100 text-emerald-900">
-                        {p.status}
-                      </span>
+
+                      <p className="mt-3 text-sm text-slate-700">{p.description}</p>
+
+                      <p className="mt-2 text-sm">
+                        Budget: <b>{p.budget}</b>
+                      </p>
                     </div>
-
-                    <p className="mt-3 text-sm text-slate-700">{p.description}</p>
-
-                    <p className="mt-2 text-sm">
-                      Budget: <b>{p.budget}</b>
-                    </p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )
           )}

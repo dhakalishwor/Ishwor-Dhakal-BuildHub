@@ -94,7 +94,7 @@ export default function MyBids() {
             <div className="grid grid-cols-2 gap-4 mb-3">
               <div className="bg-emerald-50 rounded-lg p-3">
                 <p className="text-xs text-emerald-700 font-semibold">Proposed Price</p>
-                <p className="text-lg font-bold text-emerald-900">${bid.proposed_price}</p>
+                <p className="text-lg font-bold text-emerald-900">NPR {bid.proposed_price}</p>
               </div>
               <div className="bg-blue-50 rounded-lg p-3">
                 <p className="text-xs text-blue-700 font-semibold">Duration</p>

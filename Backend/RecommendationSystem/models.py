@@ -24,6 +24,14 @@ class Project(models.Model):
         related_name="client_projects",
     )
 
+    assigned_contractor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_projects",
+    )
+
     title = models.CharField(max_length=150)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     location = models.CharField(max_length=150)
