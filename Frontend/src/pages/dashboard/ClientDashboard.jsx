@@ -19,7 +19,61 @@ function normalizeProject(p) {
     location: p.location || "",
     description: p.description || "",
     rated: !!p.rating,
+    payment_status: p.payment_status || "UNPAID",
+    final_amount: p.final_amount ?? null,
   };
+}
+
+function submitEsewaForm(url, payload) {
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = url;
+
+  Object.entries(payload).forEach(([key, value]) => {
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = key;
+    input.value = String(value ?? "");
+    form.appendChild(input);
+  });
+
+  document.body.appendChild(form);
+  form.submit();
+  form.remove();
+}
+
+function PayWithEsewaButton({ projectId, onStarted }) {
+  const [loading, setLoading] = useState(false);
+
+  async function handlePay() {
+    setLoading(true);
+    try {
+      const res = await api.post(`/api/payments/initiate/${projectId}/`);
+
+      const esewaFormUrl = res.data?.esewa_form_url;
+      const payload = res.data?.payload;
+
+      if (!esewaFormUrl) throw new Error("esewa_form_url missing from backend response.");
+      if (!payload) throw new Error("payload missing from backend response.");
+
+      if (onStarted) onStarted();
+
+      submitEsewaForm(esewaFormUrl, payload);
+    } catch (err) {
+      alert(err?.response?.data?.detail || err?.message || "Payment initiation failed.");
+      setLoading(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={handlePay}
+      disabled={loading}
+      className="mt-2 rounded-lg bg-green-600 px-3 py-1 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-60"
+    >
+      {loading ? "Redirecting..." : "Pay with eSewa"}
+    </button>
+  );
 }
 
 function RateProject({ projectId, onDone }) {
@@ -83,15 +137,16 @@ function MyProjectsView({
   onRefresh,
   onMarkCompleted,
   actionLoadingId,
+  ratingProjectId,
+  setRatingProjectId,
+  onRated,
+  onPaymentStarted,
 }) {
   return (
     <div className="max-w-5xl mx-auto">
       <div className="flex items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-emerald-900">My Projects</h1>
-          <p className="text-sm text-slate-600">
-            Manage your projects and mark them completed after work is done.
-          </p>
         </div>
 
         <button
@@ -115,9 +170,7 @@ function MyProjectsView({
       )}
 
       {!loading && !error && projects.length === 0 ? (
-        <div className="bg-white p-6 rounded-xl shadow">
-          No projects posted yet.
-        </div>
+        <div className="bg-white p-6 rounded-xl shadow">No projects posted yet.</div>
       ) : (
         !loading &&
         !error && (
@@ -126,9 +179,7 @@ function MyProjectsView({
               <div key={p.id} className="bg-white rounded-xl shadow p-5 border">
                 <div className="flex justify-between items-center gap-4">
                   <div>
-                    <h3 className="font-semibold text-emerald-900">
-                      {p.title}
-                    </h3>
+                    <h3 className="font-semibold text-emerald-900">{p.title}</h3>
                     <p className="text-sm text-slate-500">
                       {p.category} • {p.location}
                     </p>
@@ -145,16 +196,8 @@ function MyProjectsView({
                         disabled={actionLoadingId === p.id}
                         className="rounded-lg bg-slate-800 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-900 disabled:opacity-60"
                       >
-                        {actionLoadingId === p.id
-                          ? "Completing..."
-                          : "Mark Completed"}
+                        {actionLoadingId === p.id ? "Completing..." : "Mark Completed"}
                       </button>
-                    )}
-
-                    {p.status === "COMPLETED" && p.rated && (
-                      <span className="text-xs px-3 py-1 rounded-full bg-emerald-50 text-emerald-900 border border-emerald-200">
-                        Already Rated
-                      </span>
                     )}
                   </div>
                 </div>
@@ -163,6 +206,48 @@ function MyProjectsView({
                 <p className="mt-2 text-sm">
                   Budget: <b>{p.budget}</b>
                 </p>
+
+                {p.status === "COMPLETED" && p.payment_status !== "PAID" && (
+                  <div className="mt-3 rounded-xl border border-yellow-200 bg-yellow-50 p-3">
+                    <p className="text-sm text-yellow-900 font-semibold">
+                      Payment required (accepted bid amount)
+                    </p>
+                    <PayWithEsewaButton projectId={p.id} onStarted={onPaymentStarted} />
+                  </div>
+                )}
+
+                {p.status === "COMPLETED" && p.payment_status === "PAID" && (
+                  <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                    <p className="text-sm text-emerald-900 font-semibold">
+                      Paid ✅ {p.final_amount ? `NPR ${p.final_amount}` : ""}
+                    </p>
+                  </div>
+                )}
+
+                {p.status === "COMPLETED" && p.payment_status === "PAID" && !p.rated && (
+                  <div className="mt-3">
+                    <button
+                      onClick={() => setRatingProjectId(ratingProjectId === p.id ? null : p.id)}
+                      className="rounded-lg bg-emerald-700 px-3 py-1 text-xs text-white"
+                    >
+                      Rate Project
+                    </button>
+
+                    {ratingProjectId === p.id && (
+                      <RateProject
+                        projectId={p.id}
+                        onDone={() => {
+                          setRatingProjectId(null);
+                          onRated();
+                        }}
+                      />
+                    )}
+                  </div>
+                )}
+
+                {p.status === "COMPLETED" && p.payment_status === "PAID" && p.rated && (
+                  <p className="mt-3 text-xs text-emerald-700 font-semibold">Already Rated</p>
+                )}
               </div>
             ))}
           </div>
@@ -186,9 +271,7 @@ export default function ClientDashboard() {
     setProjectsError("");
     try {
       const res = await api.get("/api/projects/");
-      const list = Array.isArray(res.data)
-        ? res.data.map(normalizeProject)
-        : [];
+      const list = Array.isArray(res.data) ? res.data.map(normalizeProject) : [];
       setProjects(list);
     } catch (e) {
       setProjectsError(e?.response?.data?.detail || "Failed to load projects.");
@@ -203,7 +286,7 @@ export default function ClientDashboard() {
     try {
       await api.patch(`/api/projects/${projectId}/complete/`);
       await loadProjects();
-      alert("Project marked as completed!");
+      alert("Project marked as completed! Now you can pay the accepted bid amount.");
     } catch (e) {
       alert(e?.response?.data?.detail || "Failed to complete project.");
     } finally {
@@ -213,27 +296,40 @@ export default function ClientDashboard() {
 
   useEffect(() => {
     loadProjects();
+
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("paid") === "1") {
+      loadProjects();
+      url.searchParams.delete("paid");
+      window.history.replaceState({}, "", url.pathname);
+      setActiveMenu("my-projects");
+    }
   }, []);
 
   const filteredProjects = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return projects;
     return projects.filter((p) =>
-      [p.title, p.category, p.status, p.location]
-        .join(" ")
-        .toLowerCase()
-        .includes(q)
+      [p.title, p.category, p.status, p.location].join(" ").toLowerCase().includes(q)
     );
   }, [search, projects]);
 
   const stats = useMemo(() => {
+    const paidProjects = projects.filter(
+      (p) => p.status === "COMPLETED" && p.payment_status === "PAID"
+    );
+
+    const totalPaidAmount = paidProjects.reduce(
+      (sum, p) => sum + Number(p.final_amount || 0),
+      0
+    );
+
     return {
       active: projects.filter((p) => p.status === "ACTIVE").length,
       bidding: projects.filter((p) => p.status === "BIDDING").length,
       completed: projects.filter((p) => p.status === "COMPLETED").length,
-      totalSpend: projects
-        .filter((p) => p.status === "COMPLETED")
-        .reduce((s, p) => s + Number(p.budget || 0), 0),
+      paid: paidProjects.length,
+      totalPaidAmount,
     };
   }, [projects]);
 
@@ -244,10 +340,6 @@ export default function ClientDashboard() {
     { key: "project-bids", label: "Project Bids" },
     { key: "profile", label: "Profile" },
   ];
-
-  function handleMenuClick(item) {
-    setActiveMenu(item.key);
-  }
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
@@ -278,12 +370,10 @@ export default function ClientDashboard() {
           {menuItems.map((item) => (
             <button
               key={item.key}
-              onClick={() => handleMenuClick(item)}
+              onClick={() => setActiveMenu(item.key)}
               className={classNames(
                 "mt-3 w-full rounded-xl px-4 py-3 text-left",
-                activeMenu === item.key
-                  ? "bg-emerald-700"
-                  : "hover:bg-emerald-800"
+                activeMenu === item.key ? "bg-emerald-700" : "hover:bg-emerald-800"
               )}
             >
               {item.label}
@@ -301,18 +391,13 @@ export default function ClientDashboard() {
                 className="mb-4 w-full rounded-xl border px-4 py-2"
               />
 
-              <div className="grid grid-cols-4 gap-4 mb-6">
-                <div className="border p-4 rounded-xl">
-                  Active: {stats.active}
-                </div>
-                <div className="border p-4 rounded-xl">
-                  Bidding: {stats.bidding}
-                </div>
-                <div className="border p-4 rounded-xl">
-                  Completed: {stats.completed}
-                </div>
-                <div className="border p-4 rounded-xl">
-                  Spend: NPR {stats.totalSpend}
+              <div className="grid grid-cols-5 gap-4 mb-6">
+                <div className="border p-4 rounded-xl">Active: {stats.active}</div>
+                <div className="border p-4 rounded-xl">Bidding: {stats.bidding}</div>
+                <div className="border p-4 rounded-xl">Completed: {stats.completed}</div>
+                <div className="border p-4 rounded-xl">Paid: {stats.paid}</div>
+                <div className="border p-4 rounded-xl bg-emerald-50 text-emerald-900 font-semibold">
+                  Total Paid: NPR {stats.totalPaidAmount}
                 </div>
               </div>
 
@@ -326,7 +411,9 @@ export default function ClientDashboard() {
                     <p className="text-sm">
                       {p.category} • {p.location}
                     </p>
-                    <p className="text-sm mt-1">Status: {p.status}</p>
+                    <p className="text-sm mt-1">
+                      Status: {p.status} • Payment: {p.payment_status}
+                    </p>
 
                     {p.status === "ACTIVE" && (
                       <button
@@ -334,20 +421,31 @@ export default function ClientDashboard() {
                         disabled={actionLoadingId === p.id}
                         className="mt-2 rounded-lg bg-slate-800 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-900 disabled:opacity-60"
                       >
-                        {actionLoadingId === p.id
-                          ? "Completing..."
-                          : "Mark Completed"}
+                        {actionLoadingId === p.id ? "Completing..." : "Mark Completed"}
                       </button>
                     )}
 
-                    {p.status === "COMPLETED" && !p.rated && (
+                    {p.status === "COMPLETED" && p.payment_status !== "PAID" && (
+                      <div className="mt-3 rounded-xl border border-yellow-200 bg-yellow-50 p-3">
+                        <p className="text-sm text-yellow-900 font-semibold">
+                          Pay accepted bid amount to finish this project
+                        </p>
+                        <PayWithEsewaButton projectId={p.id} onStarted={() => {}} />
+                      </div>
+                    )}
+
+                    {p.status === "COMPLETED" && p.payment_status === "PAID" && (
+                      <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                        <p className="text-sm text-emerald-900 font-semibold">
+                          Paid ✅ {p.final_amount ? `NPR ${p.final_amount}` : ""}
+                        </p>
+                      </div>
+                    )}
+
+                    {p.status === "COMPLETED" && p.payment_status === "PAID" && !p.rated && (
                       <>
                         <button
-                          onClick={() =>
-                            setRatingProjectId(
-                              ratingProjectId === p.id ? null : p.id
-                            )
-                          }
+                          onClick={() => setRatingProjectId(ratingProjectId === p.id ? null : p.id)}
                           className="mt-2 rounded-lg bg-emerald-700 px-3 py-1 text-xs text-white"
                         >
                           Rate Project
@@ -365,10 +463,8 @@ export default function ClientDashboard() {
                       </>
                     )}
 
-                    {p.rated && (
-                      <p className="mt-2 text-xs text-emerald-700 font-semibold">
-                        Already Rated
-                      </p>
+                    {p.status === "COMPLETED" && p.payment_status === "PAID" && p.rated && (
+                      <p className="mt-2 text-xs text-emerald-700 font-semibold">Already Rated</p>
                     )}
                   </div>
                 ))}
@@ -384,6 +480,10 @@ export default function ClientDashboard() {
               onRefresh={loadProjects}
               onMarkCompleted={markCompleted}
               actionLoadingId={actionLoadingId}
+              ratingProjectId={ratingProjectId}
+              setRatingProjectId={setRatingProjectId}
+              onRated={loadProjects}
+              onPaymentStarted={() => {}}
             />
           )}
 
@@ -403,9 +503,7 @@ export default function ClientDashboard() {
           {activeMenu === "profile" && (
             <div className="rounded-2xl border bg-white p-8 shadow-sm">
               <h2 className="text-xl font-bold text-emerald-900">PROFILE</h2>
-              <p className="mt-2 text-sm text-slate-600">
-                This page is for profile.
-              </p>
+              <p className="mt-2 text-sm text-slate-600">This page is for profile.</p>
             </div>
           )}
         </main>

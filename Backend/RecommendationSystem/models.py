@@ -18,6 +18,15 @@ class Project(models.Model):
         ("COMPLETED", "Completed"),
     ]
 
+    PAYMENT_STATUS_CHOICES = [
+        ("UNPAID", "Unpaid"),
+        ("PAID", "Paid"),
+    ]
+
+    PAYMENT_METHOD_CHOICES = [
+        ("ESEWA", "eSewa"),
+    ]
+
     client = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -43,6 +52,20 @@ class Project(models.Model):
 
     status = models.CharField(max_length=15, choices=STATUS_CHOICES, default="BIDDING")
     created_at = models.DateTimeField(auto_now_add=True)
+
+    payment_status = models.CharField(
+        max_length=10,
+        choices=PAYMENT_STATUS_CHOICES,
+        default="UNPAID",
+    )
+    paid_at = models.DateTimeField(null=True, blank=True)
+    payment_method = models.CharField(
+        max_length=10,
+        choices=PAYMENT_METHOD_CHOICES,
+        null=True,
+        blank=True,
+    )
+    final_amount = models.PositiveIntegerField(null=True, blank=True)
 
     def __str__(self):
         return self.title

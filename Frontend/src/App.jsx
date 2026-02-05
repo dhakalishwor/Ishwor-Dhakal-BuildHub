@@ -11,6 +11,8 @@ import ContractorDashboard from "./pages/dashboard/ContractorDashboard";
 import MyProjects from "./pages/client/MyProjects";
 import ProjectBids from "./pages/client/ProjectBids";
 import AvailableProjects from "./pages/Contractor/AvailableProjects";
+import EsewaFailure from "./pages/payments/EsewaFailure";
+import EsewaSuccess from "./pages/payments/EsewaSuccess";
 
 function App() {
   return (
@@ -27,6 +29,8 @@ function App() {
       <Route path="/client/myprojects" element={<MyProjects />} />
       <Route path="/client/project-bids" element={<ProjectBids />} />
       <Route path="/contractor/available-projects" element={<AvailableProjects />} />
+      <Route path="/payment/esewa/success" element={<EsewaSuccess />} />
+      <Route path="/payment/esewa/failure" element={<EsewaFailure />} />
     </Routes>
   );
 }

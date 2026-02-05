@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "ContractorManagement",
     "BiddingSystem",
     "RatingSystem",
+    "payments",
 ]
 
 
@@ -64,6 +65,17 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'BuildHub.urls'
 
 AUTH_USER_MODEL = "Authentication.User"
+
+#For Payment
+ESEWA_PRODUCT_CODE = "EPAYTEST"
+ESEWA_SECRET_KEY = "8gBm/:&EnhH.1/q"
+
+# v2 form endpoint (UAT)
+ESEWA_FORM_URL = "https://rc-epay.esewa.com.np/api/epay/main/v2/form"
+
+# where eSewa redirects after payment
+ESEWA_SUCCESS_URL = "http://localhost:5173/payment/esewa/success"
+ESEWA_FAILURE_URL = "http://localhost:5173/payment/esewa/failure"
 
 
 
