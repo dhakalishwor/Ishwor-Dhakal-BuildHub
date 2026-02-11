@@ -13,7 +13,7 @@ import ProjectBids from "./pages/client/ProjectBids";
 import AvailableProjects from "./pages/Contractor/AvailableProjects";
 import EsewaFailure from "./pages/payments/EsewaFailure";
 import EsewaSuccess from "./pages/payments/EsewaSuccess";
-import WorkerDashboard from "./pages/dashboard/WorkerDashbord";
+import WorkerDashboard from "./pages/dashboard/WorkerDashboard";
 
 function App() {
   return (
