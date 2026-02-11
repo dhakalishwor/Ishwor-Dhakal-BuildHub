@@ -20,31 +20,75 @@ export default function PostProject({ onCreated, onDone }) {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
 
-  async function onSubmit(e) {
-    e.preventDefault();
-    setSaving(true);
-    setError("");
+ async function onSubmit(e) {
+  e.preventDefault();
+  setSaving(true);
+  setError("");
 
-    try {
-      const res = await api.post("/api/projects/", {
-        title: form.title,
-        category: form.category,
-        location: form.location,
-        description: form.description,
-        budget: Number(form.budget),
-        start_date: form.startDate || null,
-        end_date: form.endDate || null,
-      });
+  try {
+    const title = form.title.trim();
+    const location = form.location.trim();
+    const description = form.description.trim();
 
-      onCreated?.(res.data);
-      onDone?.();
-      setForm(initialForm);
-    } catch (err) {
-      setError(err?.response?.data?.detail || "Failed to post project. Please try again.");
-    } finally {
+    const budgetNum = Number(form.budget);
+    if (!Number.isFinite(budgetNum) || budgetNum <= 0) {
+      setError("Budget must be a valid number greater than 0.");
       setSaving(false);
+      return;
     }
+
+    if (form.startDate && form.endDate && form.endDate < form.startDate) {
+      setError("End date cannot be earlier than start date.");
+      setSaving(false);
+      return;
+    }
+
+    const payload = {
+      title,
+      category: form.category,
+      location,
+      description,
+      budget: budgetNum,
+    };
+
+    if (form.startDate) payload.start_date = form.startDate;
+    if (form.endDate) payload.end_date = form.endDate;
+
+    const res = await api.post("/api/projects/", payload);
+
+    onCreated?.(res.data);
+    onDone?.();
+    setForm(initialForm);
+  } catch (err) {
+    const data = err?.response?.data;
+
+    console.log("POST /api/projects/ error:", data); 
+
+    let msg = "Failed to post project. Please try again.";
+
+    if (typeof data === "string") {
+      msg = data;
+    } else if (data?.detail) {
+      msg = data.detail;
+    } else if (data && typeof data === "object") {
+      msg = Object.entries(data)
+        .map(([key, val]) => {
+          if (Array.isArray(val)) return `${key}: ${val[0]}`;
+          if (val && typeof val === "object") return `${key}: ${JSON.stringify(val)}`;
+          return `${key}: ${String(val)}`;
+        })
+        .join(" | ");
+    } else if (err?.message) {
+      msg = err.message;
+    }
+
+    setError(msg);
+  } finally {
+    setSaving(false);
   }
+}
+
+
 
   return (
     <div className="max-w-3xl mx-auto">

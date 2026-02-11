@@ -33,6 +33,7 @@ export default function ContractorDashboard() {
   const [saving, setSaving] = useState(false);
   const [apiError, setApiError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const HEADER_H = 64;
 
   const filteredTypes = useMemo(() => {
     const q = searchType.trim().toLowerCase();
@@ -57,33 +58,31 @@ export default function ContractorDashboard() {
           address: data.address || "",
           projectTypes: Array.isArray(data.projectTypes) ? data.projectTypes : [],
           experienceYears:
-            data.experienceYears === 0 || data.experienceYears ? String(data.experienceYears) : "",
-          avgRating: typeof data.avgRating === "number" ? data.avgRating : Number(data.avgRating || 0),
+            data.experienceYears === 0 || data.experienceYears
+              ? String(data.experienceYears)
+              : "",
+          avgRating:
+            typeof data.avgRating === "number" ? data.avgRating : Number(data.avgRating || 0),
           totalRatings:
-            typeof data.totalRatings === "number" ? data.totalRatings : Number(data.totalRatings || 0),
+            typeof data.totalRatings === "number"
+              ? data.totalRatings
+              : Number(data.totalRatings || 0),
         };
 
         setProfile(normalized);
         setForm(normalized);
       } catch (err) {
         if (!mounted) return;
-        console.error("Contractor profile load error:", err);
 
         const status = err?.response?.status;
         let msg = "Failed to load contractor profile. Please login again and check token.";
 
-        if (status === 401) {
-          msg = "Authentication failed. Please login again.";
-        } else if (status === 403) {
-          msg =
-            err?.response?.data?.detail || "You don't have permission to access this resource.";
-        } else if (status === 500) {
-          msg = "Server error. Please try again later.";
-        } else if (err?.response?.data?.detail) {
-          msg = err.response.data.detail;
-        } else if (err?.message) {
-          msg = err.message;
-        }
+        if (status === 401) msg = "Authentication failed. Please login again.";
+        else if (status === 403)
+          msg = err?.response?.data?.detail || "You don't have permission to access this resource.";
+        else if (status === 500) msg = "Server error. Please try again later.";
+        else if (err?.response?.data?.detail) msg = err.response.data.detail;
+        else if (err?.message) msg = err.message;
 
         setApiError(msg);
       } finally {
@@ -168,14 +167,9 @@ export default function ContractorDashboard() {
         projectTypes: Array.isArray(data.projectTypes) ? data.projectTypes : payload.projectTypes,
         experienceYears:
           data.experienceYears === 0 || data.experienceYears ? String(data.experienceYears) : "0",
-        avgRating:
-          typeof data.avgRating === "number"
-            ? data.avgRating
-            : (profile.avgRating ?? 0),
+        avgRating: typeof data.avgRating === "number" ? data.avgRating : profile.avgRating ?? 0,
         totalRatings:
-          typeof data.totalRatings === "number"
-            ? data.totalRatings
-            : (profile.totalRatings ?? 0),
+          typeof data.totalRatings === "number" ? data.totalRatings : profile.totalRatings ?? 0,
       };
 
       setProfile(normalized);
@@ -184,10 +178,10 @@ export default function ContractorDashboard() {
       setSearchType("");
       setSuccessMsg("Profile updated successfully.");
     } catch (err) {
-      const msg =
+      setApiError(
         err?.response?.data?.detail ||
-        "Failed to update profile. Make sure you are logged in as CONTRACTOR and token is valid.";
-      setApiError(msg);
+          "Failed to update profile. Make sure you are logged in as CONTRACTOR and token is valid."
+      );
     } finally {
       setSaving(false);
     }
@@ -195,7 +189,10 @@ export default function ContractorDashboard() {
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
-      <header className="sticky top-0 z-10 border-b bg-white/90 backdrop-blur">
+      <header
+        className="sticky top-0 z-20 border-b bg-white/90 backdrop-blur"
+        style={{ height: HEADER_H }}
+      >
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center font-bold">
@@ -221,9 +218,18 @@ export default function ContractorDashboard() {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-7xl grid-cols-1 md:grid-cols-[260px_1fr]">
-        <aside className="border-r bg-emerald-900 text-white">
-          <div className="p-4">
+      {/* IMPORTANT: make the grid take full height under the header */}
+      <div
+        className="mx-auto grid max-w-7xl grid-cols-1 md:grid-cols-[260px_1fr]"
+        style={{ minHeight: `calc(100vh - ${HEADER_H}px)` }}
+      >
+        {/* IMPORTANT: sticky sidebar + fixed height */}
+        <aside
+          className="border-r bg-emerald-900 text-white md:sticky"
+          style={{ top: HEADER_H, height: `calc(100vh - ${HEADER_H}px)` }}
+        >
+          {/* allow sidebar to scroll if menu grows */}
+          <div className="p-4 h-full overflow-y-auto">
             <p className="text-xs uppercase tracking-wider text-emerald-200">Contractor Menu</p>
 
             {[
@@ -264,9 +270,7 @@ export default function ContractorDashboard() {
                   <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
                     <div>
                       <h1 className="text-2xl font-bold text-emerald-900">Profile Management</h1>
-                      <p className="text-sm text-slate-600">
-                        Update your contractor profile details.
-                      </p>
+                      <p className="text-sm text-slate-600">Update your contractor profile details.</p>
                     </div>
 
                     {!editing ? (
@@ -363,7 +367,6 @@ export default function ContractorDashboard() {
                               ({Number(profile.totalRatings || 0)} ratings)
                             </span>
                           </p>
-                          
                         </div>
                       </div>
                     ) : (
@@ -502,9 +505,7 @@ export default function ContractorDashboard() {
               {activeMenu === "messages" && (
                 <div className="rounded-2xl border bg-white p-8 shadow-sm">
                   <h2 className="text-xl font-bold text-emerald-900">MESSAGES</h2>
-                  <p className="mt-2 text-sm text-slate-600">
-                    this is message section.
-                  </p>
+                  <p className="mt-2 text-sm text-slate-600">this is message section.</p>
                 </div>
               )}
             </div>

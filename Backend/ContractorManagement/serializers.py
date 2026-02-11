@@ -5,8 +5,13 @@ from RecommendationSystem.models import Project
 
 class ContractorSerializer(serializers.ModelSerializer):
     fullName = serializers.CharField(source="full_name")
-    projectTypes = serializers.JSONField(source="project_types")
+    projectTypes = serializers.JSONField(source="project_types", required=False, default=list)
     experienceYears = serializers.IntegerField(source="experience_years")
+    contractorType = serializers.CharField(source="contractor_type", required=False)
+    workType = serializers.CharField(source="work_type")
+    phone = serializers.CharField()
+    availabilityStatus = serializers.CharField(source="availability_status", required=False)
+    rateType = serializers.CharField(source="rate_type", required=False)
 
     avgRating = serializers.SerializerMethodField()
     totalRatings = serializers.SerializerMethodField()
@@ -20,6 +25,11 @@ class ContractorSerializer(serializers.ModelSerializer):
             "address",
             "projectTypes",
             "experienceYears",
+            "contractorType",
+            "workType",
+            "phone",
+            "availabilityStatus",
+            "rateType",
             "avgRating",
             "totalRatings",
         ]

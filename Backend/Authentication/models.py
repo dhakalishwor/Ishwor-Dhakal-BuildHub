@@ -6,11 +6,13 @@ class User(AbstractUser):
     ROLE_CLIENT = "client"
     ROLE_CONTRACTOR = "contractor"
     ROLE_WORKER = "worker"
+    ROLE_ADMIN = "admin"
 
     ROLE_CHOICES = (
         (ROLE_CLIENT, "Client"),
         (ROLE_CONTRACTOR, "Contractor"),
         (ROLE_WORKER, "Worker"),
+        (ROLE_ADMIN, "Admin"),
     )
 
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_CLIENT)

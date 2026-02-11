@@ -17,13 +17,13 @@ import EsewaSuccess from "./pages/payments/EsewaSuccess";
 function App() {
   return (
     <Routes>
-      <Route path ="/" element = {<Landing/>}/>
+      <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
-      <Route path ="/clientdashboard" element={<ClientDashboard/>}/>
-      <Route path="/AdminDashboard" element={<AdminDashboard/>}/>
+      <Route path="/clientdashboard" element={<ClientDashboard />} />
+      <Route path="/admin/dashboard" element={<AdminDashboard />} />
       <Route path="/contractor/upload-license" element={<UploadLicense />} />
-      <Route path="/client/postproject" element={<PostProject/>}/>
+      <Route path="/client/postproject" element={<PostProject />} />
       <Route path="/contractor" element={<ContractorDashboard />} />
       <Route path="/client/projects" element={<MyProjects />} />
       <Route path="/client/myprojects" element={<MyProjects />} />

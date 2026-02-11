@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 
 from .models import Contractor
 from .serializers import ContractorSerializer
+from .permissions import IsContractorOwner
 
 User = get_user_model()
 
@@ -13,7 +14,7 @@ User = get_user_model()
 class ContractorViewSet(viewsets.ModelViewSet):
     queryset = Contractor.objects.all()
     serializer_class = ContractorSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsContractorOwner]
 
     @action(detail=False, methods=["get", "put", "patch"], url_path="me")
     def me(self, request):

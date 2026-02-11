@@ -2,6 +2,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 from django.contrib.auth import get_user_model
 from django.conf import settings
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -9,6 +10,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 import re
 import pytesseract
 from .models import ContractorLicense
+from .permissions import IsAdminRole
 from .serializers import (
     RegisterSerializer,
     RoleBasedTokenObtainPairSerializer,
@@ -279,3 +281,39 @@ class ContractorLicenseUpdateView(APIView):
             },
             status=status.HTTP_200_OK
         )
+
+
+class AdminLicenseListView(generics.ListAPIView):
+    """
+    Admin can see all uploaded licenses.
+    """
+    queryset = ContractorLicense.objects.all().order_by("-updated_at")
+    serializer_class = ContractorLicenseUploadSerializer 
+    permission_classes = [IsAuthenticated, IsAdminRole]
+
+
+class AdminLicenseReviewView(APIView):
+    """
+    Admin can approve or reject a license.
+    """
+    permission_classes = [IsAuthenticated, IsAdminRole]
+
+    def patch(self, request, pk):
+        license_obj = get_object_or_404(ContractorLicense, pk=pk)
+        new_status = request.data.get("status")
+        reason = request.data.get("rejection_reason", "")
+
+        if new_status not in [ContractorLicense.STATUS_VERIFIED, ContractorLicense.STATUS_REJECTED]:
+            return Response(
+                {"detail": "Invalid status. Must be VERIFIED or REJECTED."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        license_obj.status = new_status
+        if new_status == ContractorLicense.STATUS_REJECTED:
+            license_obj.rejection_reason = reason
+        else:
+            license_obj.rejection_reason = ""
+            
+        license_obj.save()
+        return Response({"detail": f"License marked as {new_status}."})

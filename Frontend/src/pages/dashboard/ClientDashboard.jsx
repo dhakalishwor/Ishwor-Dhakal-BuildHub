@@ -141,13 +141,30 @@ function MyProjectsView({
   setRatingProjectId,
   onRated,
   onPaymentStarted,
+  recommendedContractors = [],
 }) {
   return (
     <div className="max-w-5xl mx-auto">
-      <div className="flex items-center justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-emerald-900">My Projects</h1>
+      {recommendedContractors.length > 0 && (
+        <div className="mb-6 rounded-2xl border bg-emerald-100/60 p-5">
+          <h2 className="text-lg font-bold text-emerald-900">Recommended Contractors</h2>
+          <p className="text-sm text-emerald-900/80 mb-4">Based on your newly posted project</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {recommendedContractors.map((c) => (
+              <div key={c.id} className="rounded-xl bg-white p-4 shadow-sm border border-emerald-100">
+                <p className="font-semibold text-emerald-900">{c.fullName}</p>
+                <p className="text-sm text-slate-600">Experience: {c.experienceYears} years</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Types: {(c.projectTypes || []).join(", ")}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
+      )}
+
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <h1 className="text-2xl font-bold text-emerald-900">My Projects</h1>
 
         <button
           onClick={onRefresh}
@@ -265,6 +282,7 @@ export default function ClientDashboard() {
   const [projectsError, setProjectsError] = useState("");
   const [ratingProjectId, setRatingProjectId] = useState(null);
   const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [recommendedContractors, setRecommendedContractors] = useState([]);
 
   async function loadProjects() {
     setLoadingProjects(true);
@@ -341,9 +359,11 @@ export default function ClientDashboard() {
     { key: "profile", label: "Profile" },
   ];
 
+  const HEADER_H = 64;
+
   return (
     <div className="min-h-screen bg-white text-slate-900">
-      <header className="sticky top-0 z-10 border-b bg-white">
+      <header className="sticky top-0 z-20 border-b bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center font-bold">
@@ -364,21 +384,35 @@ export default function ClientDashboard() {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-7xl grid-cols-1 md:grid-cols-[260px_1fr]">
-        <aside className="border-r bg-emerald-900 text-white p-4">
+      {/* IMPORTANT: make the whole body at least full height minus header */}
+      <div
+        className="mx-auto grid max-w-7xl grid-cols-1 md:grid-cols-[260px_1fr]"
+        style={{ minHeight: `calc(100vh - ${HEADER_H}px)` }}
+      >
+        {/* Sticky full-height sidebar */}
+        <aside
+          className="border-r bg-emerald-900 text-white p-4 md:sticky md:top-[64px]"
+          style={{ height: `calc(100vh - ${HEADER_H}px)` }}
+        >
           <p className="text-xs uppercase text-emerald-200">Client Menu</p>
-          {menuItems.map((item) => (
-            <button
-              key={item.key}
-              onClick={() => setActiveMenu(item.key)}
-              className={classNames(
-                "mt-3 w-full rounded-xl px-4 py-3 text-left",
-                activeMenu === item.key ? "bg-emerald-700" : "hover:bg-emerald-800"
-              )}
-            >
-              {item.label}
-            </button>
-          ))}
+
+          <div className="mt-2 space-y-3">
+            {menuItems.map((item) => (
+              <button
+                key={item.key}
+                onClick={() => {
+                  setActiveMenu(item.key);
+                  if (item.key !== "my-projects") setRecommendedContractors([]);
+                }}
+                className={classNames(
+                  "w-full rounded-xl px-4 py-3 text-left transition",
+                  activeMenu === item.key ? "bg-emerald-700" : "hover:bg-emerald-800"
+                )}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         </aside>
 
         <main className="p-6">
@@ -391,7 +425,8 @@ export default function ClientDashboard() {
                 className="mb-4 w-full rounded-xl border px-4 py-2"
               />
 
-              <div className="grid grid-cols-5 gap-4 mb-6">
+              {/* Responsive stats grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
                 <div className="border p-4 rounded-xl">Active: {stats.active}</div>
                 <div className="border p-4 rounded-xl">Bidding: {stats.bidding}</div>
                 <div className="border p-4 rounded-xl">Completed: {stats.completed}</div>
@@ -430,7 +465,7 @@ export default function ClientDashboard() {
                         <p className="text-sm text-yellow-900 font-semibold">
                           Pay accepted bid amount to finish this project
                         </p>
-                        <PayWithEsewaButton projectId={p.id} onStarted={() => {}} />
+                        <PayWithEsewaButton projectId={p.id} onStarted={() => { }} />
                       </div>
                     )}
 
@@ -464,7 +499,9 @@ export default function ClientDashboard() {
                     )}
 
                     {p.status === "COMPLETED" && p.payment_status === "PAID" && p.rated && (
-                      <p className="mt-2 text-xs text-emerald-700 font-semibold">Already Rated</p>
+                      <p className="mt-2 text-xs text-emerald-700 font-semibold">
+                        Already Rated
+                      </p>
                     )}
                   </div>
                 ))}
@@ -483,14 +520,16 @@ export default function ClientDashboard() {
               ratingProjectId={ratingProjectId}
               setRatingProjectId={setRatingProjectId}
               onRated={loadProjects}
-              onPaymentStarted={() => {}}
+              onPaymentStarted={() => { }}
+              recommendedContractors={recommendedContractors}
             />
           )}
 
           {activeMenu === "postproject" && (
             <PostProject
-              onCreated={() => {
+              onCreated={(data) => {
                 loadProjects();
+                setRecommendedContractors(data.recommended_contractors || data.recommended || []);
                 setActiveMenu("my-projects");
               }}
             />
