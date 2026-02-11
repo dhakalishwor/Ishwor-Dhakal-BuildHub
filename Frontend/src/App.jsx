@@ -13,6 +13,7 @@ import ProjectBids from "./pages/client/ProjectBids";
 import AvailableProjects from "./pages/Contractor/AvailableProjects";
 import EsewaFailure from "./pages/payments/EsewaFailure";
 import EsewaSuccess from "./pages/payments/EsewaSuccess";
+import WorkerDashboard from "./pages/dashboard/WorkerDashbord";
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
       <Route path="/register" element={<Register />} />
       <Route path="/clientdashboard" element={<ClientDashboard />} />
       <Route path="/admin/dashboard" element={<AdminDashboard />} />
+      <Route path="/worker/dashboard" element={<WorkerDashboard />} />
       <Route path="/contractor/upload-license" element={<UploadLicense />} />
       <Route path="/client/postproject" element={<PostProject />} />
       <Route path="/contractor" element={<ContractorDashboard />} />
