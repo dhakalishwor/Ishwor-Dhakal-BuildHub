@@ -70,7 +70,7 @@ const Login = () => {
       } else if (role === "worker") {
         navigate("/worker/dashboard");
       } else {
-        navigate("/"); // fallback
+        navigate("/");
       }
     } catch (err) {
       setError(extractErrorMessage(err));

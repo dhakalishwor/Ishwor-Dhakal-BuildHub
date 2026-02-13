@@ -11,7 +11,6 @@ const UploadLicense = () => {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Ensure contractor_id exists (user came from register)
   useEffect(() => {
     const id = localStorage.getItem("pendingContractorId");
     if (!id) {

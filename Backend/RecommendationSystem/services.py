@@ -8,22 +8,18 @@ def recommend_contractors_for_project(project: Project):
     if not category_label:
         return []
 
-    # Filter by Availability (case-insensitive)
-    # Fetch all and filter
     all_contractors = Contractor.objects.all()
     
     wanted = str(category_label).strip().lower()
     matched = []
 
     for contractor in all_contractors:
-        # Check availability status case-insensitively
         status = str(getattr(contractor, "availability_status", "") or "").strip().lower()
         if status != "available":
             continue
 
         types = contractor.project_types or []
         
-        # Normalize types to a list of lower-case strings
         normalized_types = []
         if isinstance(types, str):
             normalized_types = [t.strip().lower() for t in types.split(",")]
@@ -39,7 +35,6 @@ def recommend_contractors_for_project(project: Project):
         if wanted in normalized_types:
             matched.append(contractor)
 
-    # Sort by experience_years descending
     matched.sort(
         key=lambda c: int(getattr(c, "experience_years", 0) or 0),
         reverse=True

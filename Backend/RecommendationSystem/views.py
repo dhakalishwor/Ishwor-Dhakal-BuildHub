@@ -29,7 +29,6 @@ class ProjectViewSet(ModelViewSet):
             return Project.objects.filter(client=user).order_by("-created_at")
 
         if role == "CONTRACTOR":
-            # Contractors can only see bidding projects or projects they are assigned to
             return Project.objects.filter(
                 models.Q(status="BIDDING") | models.Q(assigned_contractor=user)
             ).distinct().order_by("-created_at")

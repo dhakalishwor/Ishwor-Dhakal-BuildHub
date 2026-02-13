@@ -7,6 +7,6 @@ from .views import (
 
 urlpatterns = [
     path("payments/initiate/<int:project_id>/", InitiatePaymentView.as_view()),
-    path("payments/verify/", PaymentVerifyView.as_view()),   # ✅ REQUIRED
+    path("payments/verify/", PaymentVerifyView.as_view()),  
     path("payments/failure/", PaymentFailureView.as_view()),
 ]
