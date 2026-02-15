@@ -13,6 +13,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             "title",
             "category",
             "location",
+            "latitude",
+            "longitude",
             "description",
             "budget",
             "start_date",

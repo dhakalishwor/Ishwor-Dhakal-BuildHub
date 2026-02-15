@@ -50,23 +50,33 @@ class ContractorLicenseUploadSerializer(serializers.ModelSerializer):
         fields = ["license_document"]
         
 class RoleBasedTokenObtainPairSerializer(TokenObtainPairSerializer):
-    role = serializers.CharField(write_only=True)
+    role = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     def validate(self, attrs):
         selected_role = (attrs.get("role") or "").strip().lower()
         data = super().validate(attrs)
         user = self.user
 
-        # Admin login
+        # If role not provided by frontend, use the user's saved role
+        if not selected_role:
+            if user.is_staff or user.is_superuser:
+                selected_role = "admin"
+            else:
+                selected_role = user.role
+
+        # Admin login logic
         if selected_role == "admin":
             if not (user.is_staff or user.is_superuser):
                 raise serializers.ValidationError("You are not allowed to login as admin.")
         else:
             allowed = {User.ROLE_CLIENT, User.ROLE_CONTRACTOR, User.ROLE_WORKER}
             if selected_role not in allowed:
-                raise serializers.ValidationError("Invalid role selected.")
+                raise serializers.ValidationError("Invalid role.")
+            
+            # If they explicitly sent a role, it must match. 
+            # If we auto-selected it, it will match anyway.
             if user.role != selected_role:
-                raise serializers.ValidationError("Selected role does not match your account role.")
+                raise serializers.ValidationError(f"Your account is registered as {user.role}, not {selected_role}.")
 
             # Contractor must upload license before login
             if user.role == User.ROLE_CONTRACTOR and not hasattr(user, "contractor_license"):

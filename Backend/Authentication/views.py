@@ -121,7 +121,7 @@ class ContractorLicenseUploadView(generics.CreateAPIView):
             username = getattr(contractor, "username", "").strip()
             # Try to convert "john_doe" or "john-doe" to "John Doe"
             if "_" in username or "-" in username:
-                parts = re.split(r"[_\-]", username)
+                parts = re.split(r"[_\-]", username)    
                 if len(parts) >= 2:
                     registered_name = " ".join(p.capitalize() for p in parts[:2])
                 else:

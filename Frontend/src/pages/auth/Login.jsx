@@ -8,7 +8,6 @@ const Login = () => {
   const [formData, setFormData] = useState({
     username: "",
     password: "",
-    role: "client",
   });
 
   const [error, setError] = useState("");
@@ -34,14 +33,14 @@ const Login = () => {
       return data.non_field_errors[0];
     }
 
-  
+
     const firstKey = Object.keys(data)[0];
     const firstVal = data[firstKey];
 
     if (Array.isArray(firstVal) && firstVal.length > 0) return firstVal[0];
     if (typeof firstVal === "string") return firstVal;
 
-    return "Invalid credentials or role.";
+    return "Invalid credentials.";
   };
 
   const handleSubmit = async (e) => {
@@ -53,15 +52,16 @@ const Login = () => {
       const res = await api.post("/auth/login/", {
         username: formData.username.trim(),
         password: formData.password,
-        role: formData.role,
       });
 
       localStorage.setItem("accessToken", res.data.access);
       localStorage.setItem("refreshToken", res.data.refresh);
 
-      const role = res?.data?.user?.role || formData.role;
+      const user = res.data.user;
+      const role = user?.role;
+      const isAdmin = user?.is_admin;
 
-      if (formData.role === "admin") {
+      if (isAdmin) {
         navigate("/admin/dashboard");
       } else if (role === "client") {
         navigate("/clientdashboard");
@@ -89,26 +89,6 @@ const Login = () => {
         {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Role */}
-          <div>
-            <label className="block text-gray-700 mb-1">Login As</label>
-            <select
-              name="role"
-              value={formData.role}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
-            >
-              <option value="client">Client</option>
-              <option value="contractor">Contractor</option>
-              <option value="worker">Worker</option>
-              <option value="admin">Admin</option>
-            </select>
-
-            <p className="text-xs text-gray-500 mt-1">
-              Select the same role you registered with.
-            </p>
-          </div>
-
           {/* Username */}
           <div>
             <label className="block text-gray-700 mb-1">Username</label>

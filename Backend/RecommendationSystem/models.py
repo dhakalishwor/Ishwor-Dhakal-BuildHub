@@ -44,6 +44,8 @@ class Project(models.Model):
     title = models.CharField(max_length=150)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     location = models.CharField(max_length=150)
+    latitude = models.DecimalField(max_digits=12, decimal_places=9, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=12, decimal_places=9, null=True, blank=True)
     description = models.TextField()
     budget = models.PositiveIntegerField()
 
