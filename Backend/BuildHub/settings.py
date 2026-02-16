@@ -53,6 +53,7 @@ X_FRAME_OPTIONS = os.environ.get("DJANGO_X_FRAME_OPTIONS", "DENY")
 
 
 INSTALLED_APPS = [
+    "daphne",
     "drf_spectacular",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -71,6 +72,8 @@ INSTALLED_APPS = [
     "BiddingSystem",
     "RatingSystem",
     "payments",
+    "channels",
+    "ChatSystem",
 ]
 
 AUTH_USER_MODEL = "Authentication.User"
@@ -193,3 +196,11 @@ ESEWA_FAILURE_URL = os.environ.get("ESEWA_FAILURE_URL", f"{FRONTEND_URL}/payment
 
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+ASGI_APPLICATION = "BuildHub.asgi.application"
+
+# DEV (in-memory channel layer)
+CHANNEL_LAYERS = {
+    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+}
+

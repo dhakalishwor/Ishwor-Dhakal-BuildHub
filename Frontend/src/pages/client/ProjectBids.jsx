@@ -1,12 +1,32 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../API/axios";
 
-export default function ProjectBids({ onDone }) {
+export default function ProjectBids({ onDone, onChatStarted }) {
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
   const [bids, setBids] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errMsg, setErrMsg] = useState("");
+  const navigate = useNavigate();
+
+  const startConversation = async (projectId, contractorId) => {
+    try {
+      const res = await api.post("/api/chat/start/", {
+        project_id: projectId,
+        contractor_id: contractorId,
+      });
+
+      if (onChatStarted) {
+        onChatStarted(res.data);
+      } else {
+        const conversationId = res.data.id;
+        navigate(`/messages?conversation=${conversationId}`);
+      }
+    } catch (err) {
+      alert(err?.response?.data?.error || "Failed to start conversation");
+    }
+  };
 
   const fetchProjects = async () => {
     setLoading(true);
@@ -154,8 +174,8 @@ export default function ProjectBids({ onDone }) {
                         bid.status === "PENDING"
                           ? "bg-yellow-100 text-yellow-800"
                           : bid.status === "ACCEPTED"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800",
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800",
                       ].join(" ")}
                     >
                       {bid.status}
@@ -164,7 +184,7 @@ export default function ProjectBids({ onDone }) {
 
                   <div className="space-y-1 mb-3">
                     <p className="text-sm">
-                      <span className="font-semibold">Proposed Price:</span> NPR 
+                      <span className="font-semibold">Proposed Price:</span> NPR
                       {bid.proposed_price}
                     </p>
                     <p className="text-sm">
@@ -180,6 +200,15 @@ export default function ProjectBids({ onDone }) {
                         Submitted: {new Date(bid.created_at).toLocaleDateString()}
                       </p>
                     )}
+                  </div>
+
+                  <div className="flex gap-2 mb-2">
+                    <button
+                      onClick={() => startConversation(selectedProject, bid.contractor)}
+                      className="flex-1 px-3 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 font-semibold text-sm"
+                    >
+                      Message
+                    </button>
                   </div>
 
                   {bid.status === "PENDING" && (

@@ -56,6 +56,8 @@ const Login = () => {
 
       localStorage.setItem("accessToken", res.data.access);
       localStorage.setItem("refreshToken", res.data.refresh);
+      localStorage.setItem("username", res.data.user.username);
+      localStorage.setItem("user_id", res.data.user.id);
 
       const user = res.data.user;
       const role = user?.role;
