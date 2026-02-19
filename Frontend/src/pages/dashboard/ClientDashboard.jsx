@@ -1,221 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import api from "../../API/axios";
 
 import PostProject from "../client/PostProject";
 import ProjectBids from "../client/ProjectBids";
+import CostEstimator from "../client/CostEstimator";
+import Sidebar from "../../components/Sidebar";
 
-function classNames(...classes) {
-  return classes.filter(Boolean).join(" ");
-}
-function ChatPanel({ initialConversation = null }) {
-  const [conversations, setConversations] = useState([]);
-  const [activeConv, setActiveConv] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const [connected, setConnected] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [wsError, setWsError] = useState("");
-
-  const wsRef = useRef(null);
-  const bottomRef = useRef(null);
-
-  const accessToken = localStorage.getItem("accessToken") || "";
-  const myUsername = localStorage.getItem("username") || "";
-
-  const fetchConversations = async () => {
-    try {
-      const res = await api.get("/api/chat/");
-      const convs = res.data || [];
-      setConversations(convs);
-
-      // If we have an initial conversation, set it as active
-      if (initialConversation) {
-        const found = convs.find(c => c.id === initialConversation.id);
-        setActiveConv(found || initialConversation);
-      }
-    } catch (err) {
-      console.error("Failed to fetch conversations", err);
-    }
-  };
-
-  const fetchMessages = async (convId) => {
-    setLoading(true);
-    try {
-      const res = await api.get(`/api/chat/${convId}/messages/`);
-      setMessages(res.data.map(m => ({
-        id: m.id,
-        text: m.content,
-        sender: m.sender_name,
-        sender_id: m.sender,
-        createdAt: m.created_at
-      })));
-    } catch (err) {
-      console.error("Failed to fetch messages", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  function buildWsUrl(convId) {
-    const isHttps = window.location.protocol === "https:";
-    const wsScheme = isHttps ? "wss" : "ws";
-    // Point to 8000 for local dev if necessary, or just use host
-    const host = window.location.hostname + ":8000";
-    return `${wsScheme}://${host}/ws/chat/${convId}/?token=${accessToken}`;
-  }
-
-  function connect(convId) {
-    if (!convId || !accessToken) return;
-    setWsError("");
-    if (wsRef.current) wsRef.current.close();
-
-    const ws = new WebSocket(buildWsUrl(convId));
-    wsRef.current = ws;
-
-    ws.onopen = () => setConnected(true);
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === "chat_message") {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now(),
-            text: data.message,
-            sender: data.sender,
-            sender_id: data.sender_id,
-            createdAt: data.created_at,
-          },
-        ]);
-      }
-    };
-    ws.onerror = () => setWsError("WebSocket error.");
-    ws.onclose = () => setConnected(false);
-  }
-
-  function sendMessage() {
-    const text = input.trim();
-    if (!text || !connected) return;
-    wsRef.current.send(JSON.stringify({ message: text }));
-    setInput("");
-  }
-
-  useEffect(() => {
-    fetchConversations();
-  }, [initialConversation]);
-
-  useEffect(() => {
-    if (activeConv) {
-      fetchMessages(activeConv.id);
-      connect(activeConv.id);
-    }
-    return () => wsRef.current?.close();
-  }, [activeConv]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-[250px_1fr] rounded-2xl border bg-white shadow-sm overflow-hidden h-[600px]">
-      {/* Sidebar List */}
-      <div className="border-r bg-slate-50 overflow-y-auto">
-        <div className="p-4 border-b bg-white">
-          <h3 className="font-bold text-emerald-900 text-sm">Conversations</h3>
-        </div>
-        {conversations.length === 0 ? (
-          <p className="p-4 text-xs text-slate-500">No active chats</p>
-        ) : (
-          conversations.map(c => (
-            <button
-              key={c.id}
-              onClick={() => setActiveConv(c)}
-              className={classNames(
-                "w-full text-left p-3 border-b text-xs transition-colors hover:bg-emerald-50",
-                activeConv?.id === c.id ? "bg-emerald-50 border-r-4 border-r-emerald-600" : ""
-              )}
-            >
-              <p className="font-bold text-emerald-900 truncate">{c.project.title}</p>
-              <p className="text-slate-500 truncate mt-1">
-                {c.contractor.username === myUsername ? `Client: ${c.client.username}` : `Contr: ${c.contractor.username}`}
-              </p>
-            </button>
-          ))
-        )}
-      </div>
-
-      {/* Main Chat Area */}
-      <div className="flex flex-col min-w-0">
-        <div className="border-b px-6 py-4 flex items-center justify-between bg-white">
-          <div>
-            <h2 className="text-lg font-bold text-emerald-900 uppercase">
-              {activeConv ? activeConv.project.title : "SELECT A CHAT"}
-            </h2>
-            <p className="text-xs text-slate-600">
-              {connected ? "Connected" : activeConv ? "Connecting..." : "Choose a conversation on the left"}
-            </p>
-          </div>
-          {wsError && <span className="text-xs text-red-500">{wsError}</span>}
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
-          {!activeConv ? (
-            <div className="h-full flex items-center justify-center text-slate-400 text-sm italic">
-              Click a conversation to view messages
-            </div>
-          ) : (
-            <>
-              {loading && <p className="text-center text-xs text-slate-400">Loading history...</p>}
-              {messages.map((m) => {
-                const isMe = m.sender === myUsername;
-                return (
-                  <div key={m.id} className={classNames("flex", isMe ? "justify-end" : "justify-start")}>
-                    <div
-                      className={classNames(
-                        "max-w-[85%] rounded-2xl px-4 py-2 text-sm shadow-sm border",
-                        isMe
-                          ? "bg-emerald-700 text-white border-emerald-700"
-                          : "bg-white text-slate-900 border-slate-200"
-                      )}
-                    >
-                      {!isMe && <div className="text-[10px] font-bold opacity-70 mb-1">{m.sender}</div>}
-                      <div className="whitespace-pre-wrap break-words">{m.text}</div>
-                      <div className="mt-1 text-[10px] opacity-70 text-right">
-                        {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-              <div ref={bottomRef} />
-            </>
-          )}
-        </div>
-
-        <div className="p-4 bg-white border-t">
-          <div className="flex gap-2">
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={activeConv ? "Type a message..." : "Select a chat first..."}
-              className="flex-1 rounded-xl border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
-              disabled={!connected}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") sendMessage();
-              }}
-            />
-            <button
-              onClick={sendMessage}
-              disabled={!connected || !input.trim()}
-              className="rounded-xl bg-emerald-700 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
-            >
-              Send
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function normalizeProject(p) {
   return {
@@ -484,7 +275,9 @@ function MyProjectsView({
 }
 
 export default function ClientDashboard() {
+  const navigate = useNavigate();
   const [activeMenu, setActiveMenu] = useState("dashboard");
+
   const [search, setSearch] = useState("");
   const [projects, setProjects] = useState([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
@@ -492,7 +285,9 @@ export default function ClientDashboard() {
   const [ratingProjectId, setRatingProjectId] = useState(null);
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [recommendedContractors, setRecommendedContractors] = useState([]);
-  const [selectedConversation, setSelectedConversation] = useState(null);
+
+  // NEW: optional state to pass estimate info into PostProject (if you decide to use it there)
+  const [prefillEstimate, setPrefillEstimate] = useState(null);
 
   async function loadProjects() {
     setLoadingProjects(true);
@@ -522,10 +317,16 @@ export default function ClientDashboard() {
     }
   }
 
+  const location = useLocation();
+
   useEffect(() => {
     loadProjects();
+    if (location.state?.activeMenu) {
+      setActiveMenu(location.state.activeMenu);
+    }
 
     const url = new URL(window.location.href);
+
     if (url.searchParams.get("paid") === "1") {
       loadProjects();
       url.searchParams.delete("paid");
@@ -561,16 +362,6 @@ export default function ClientDashboard() {
     };
   }, [projects]);
 
-  // ✅ UPDATED: added messages
-  const menuItems = [
-    { key: "dashboard", label: "Dashboard" },
-    { key: "postproject", label: "Post Project" },
-    { key: "my-projects", label: "My Projects" },
-    { key: "project-bids", label: "Project Bids" },
-    { key: "messages", label: "Messages" }, // ✅ added
-    { key: "profile", label: "Profile" },
-  ];
-
   const HEADER_H = 64;
 
   return (
@@ -600,30 +391,19 @@ export default function ClientDashboard() {
         className="mx-auto grid max-w-7xl grid-cols-1 md:grid-cols-[260px_1fr]"
         style={{ minHeight: `calc(100vh - ${HEADER_H}px)` }}
       >
-        <aside
-          className="border-r bg-emerald-900 text-white p-4 md:sticky md:top-[64px]"
-          style={{ height: `calc(100vh - ${HEADER_H}px)` }}
-        >
-          <p className="text-xs uppercase text-emerald-200">Client Menu</p>
+        <Sidebar
+          role="client"
+          activeMenu={activeMenu}
+          onItemClick={(key) => {
+            if (key === "messages") {
+              navigate("/messages");
+              return;
+            }
+            setActiveMenu(key);
+            if (key !== "my-projects") setRecommendedContractors([]);
+          }}
+        />
 
-          <div className="mt-2 space-y-3">
-            {menuItems.map((item) => (
-              <button
-                key={item.key}
-                onClick={() => {
-                  setActiveMenu(item.key);
-                  if (item.key !== "my-projects") setRecommendedContractors([]);
-                }}
-                className={classNames(
-                  "w-full rounded-xl px-4 py-3 text-left transition",
-                  activeMenu === item.key ? "bg-emerald-700" : "hover:bg-emerald-800"
-                )}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </aside>
 
         <main className="p-6">
           {activeMenu === "dashboard" && (
@@ -668,10 +448,61 @@ export default function ClientDashboard() {
                         {actionLoadingId === p.id ? "Completing..." : "Mark Completed"}
                       </button>
                     )}
+
+                    {p.status === "COMPLETED" && p.payment_status !== "PAID" && (
+                      <div className="mt-3 rounded-xl border border-yellow-200 bg-yellow-50 p-3">
+                        <p className="text-sm text-yellow-900 font-semibold">
+                          Pay accepted bid amount to finish this project
+                        </p>
+                        <PayWithEsewaButton projectId={p.id} onStarted={() => { }} />
+                      </div>
+                    )}
+
+                    {p.status === "COMPLETED" && p.payment_status === "PAID" && (
+                      <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                        <p className="text-sm text-emerald-900 font-semibold">
+                          Paid ✅ {p.final_amount ? `NPR ${p.final_amount}` : ""}
+                        </p>
+                      </div>
+                    )}
+
+                    {p.status === "COMPLETED" && p.payment_status === "PAID" && !p.rated && (
+                      <>
+                        <button
+                          onClick={() => setRatingProjectId(ratingProjectId === p.id ? null : p.id)}
+                          className="mt-2 rounded-lg bg-emerald-700 px-3 py-1 text-xs text-white"
+                        >
+                          Rate Project
+                        </button>
+
+                        {ratingProjectId === p.id && (
+                          <RateProject
+                            projectId={p.id}
+                            onDone={() => {
+                              setRatingProjectId(null);
+                              loadProjects();
+                            }}
+                          />
+                        )}
+                      </>
+                    )}
+
+                    {p.status === "COMPLETED" && p.payment_status === "PAID" && p.rated && (
+                      <p className="mt-2 text-xs text-emerald-700 font-semibold">Already Rated</p>
+                    )}
                   </div>
                 ))}
               </div>
             </>
+          )}
+
+          {activeMenu === "estimate" && (
+            <CostEstimator
+              onUseEstimate={(data) => {
+                setPrefillEstimate(data);
+                setActiveMenu("postproject");
+              }}
+            />
           )}
 
           {activeMenu === "my-projects" && (
@@ -692,6 +523,7 @@ export default function ClientDashboard() {
 
           {activeMenu === "postproject" && (
             <PostProject
+              prefillEstimate={prefillEstimate}
               onCreated={(data) => {
                 loadProjects();
                 setRecommendedContractors(data.recommended_contractors || data.recommended || []);
@@ -700,24 +532,7 @@ export default function ClientDashboard() {
             />
           )}
 
-          {activeMenu === "project-bids" && (
-            <ProjectBids
-              onDone={() => setActiveMenu("dashboard")}
-              onChatStarted={(conv) => {
-                setSelectedConversation(conv);
-                setActiveMenu("messages");
-              }}
-            />
-          )}
-
-          {/* ✅ NEW: Messages section */}
-          {activeMenu === "messages" && (
-            <ChatPanel
-              meLabel="You"
-              peerLabel="Contractor"
-              initialConversation={selectedConversation}
-            />
-          )}
+          {activeMenu === "project-bids" && <ProjectBids onDone={() => setActiveMenu("dashboard")} />}
 
           {activeMenu === "profile" && (
             <div className="rounded-2xl border bg-white p-8 shadow-sm">

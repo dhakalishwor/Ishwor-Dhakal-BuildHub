@@ -14,6 +14,7 @@ import AvailableProjects from "./pages/Contractor/AvailableProjects";
 import EsewaFailure from "./pages/payments/EsewaFailure";
 import EsewaSuccess from "./pages/payments/EsewaSuccess";
 import WorkerDashboard from "./pages/dashboard/WorkerDashboard";
+import MessagesPage from "./pages/message/MessagesPage";
 
 function App() {
   return (
@@ -33,8 +34,10 @@ function App() {
       <Route path="/contractor/available-projects" element={<AvailableProjects />} />
       <Route path="/payment/esewa/success" element={<EsewaSuccess />} />
       <Route path="/payment/esewa/failure" element={<EsewaFailure />} />
+      <Route path="/messages" element={<MessagesPage />} />
     </Routes>
   );
 }
+
 
 export default App;

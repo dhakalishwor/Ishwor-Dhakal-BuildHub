@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     "payments",
     "channels",
     "ChatSystem",
+    "CostEstimation",
 ]
 
 AUTH_USER_MODEL = "Authentication.User"

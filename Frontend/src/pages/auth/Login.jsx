@@ -58,6 +58,8 @@ const Login = () => {
       localStorage.setItem("refreshToken", res.data.refresh);
       localStorage.setItem("username", res.data.user.username);
       localStorage.setItem("user_id", res.data.user.id);
+      localStorage.setItem("role", res.data.user.role || "");
+
 
       const user = res.data.user;
       const role = user?.role;
