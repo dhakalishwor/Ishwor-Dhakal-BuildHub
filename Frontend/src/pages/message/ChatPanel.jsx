@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../API/axios";
 
 function classNames(...classes) {
@@ -6,6 +7,7 @@ function classNames(...classes) {
 }
 
 export default function ChatPanel({ initialConversation = null }) {
+    const navigate = useNavigate();
     const [conversations, setConversations] = useState([]);
     const [activeConv, setActiveConv] = useState(null);
     const [messages, setMessages] = useState([]);
@@ -142,13 +144,38 @@ export default function ChatPanel({ initialConversation = null }) {
             {/* Main Chat Area */}
             <div className="flex flex-col min-w-0">
                 <div className="border-b px-6 py-4 flex items-center justify-between bg-white">
-                    <div>
-                        <h2 className="text-lg font-bold text-emerald-900 uppercase">
-                            {activeConv ? activeConv.project.title : "Select a Chat"}
-                        </h2>
-                        <p className="text-xs text-slate-600">
-                            {connected ? "● Online" : activeConv ? "Connecting..." : "Choose a conversation on the left"}
-                        </p>
+                    <div className="flex items-center gap-4">
+                        <div>
+                            <h2 className="text-lg font-bold text-emerald-900 uppercase">
+                                {activeConv ? activeConv.project.title : "Select a Chat"}
+                            </h2>
+                            <p className="text-xs text-slate-600">
+                                {connected ? "● Online" : activeConv ? "Connecting..." : "Choose a conversation on the left"}
+                            </p>
+                        </div>
+                        {activeConv && (
+                            <button
+                                onClick={() => {
+                                    const reportedUser = activeConv.client.username === myUsername
+                                        ? activeConv.contractor
+                                        : activeConv.client;
+                                    navigate("/support/report", {
+                                        state: {
+                                            reported_user: reportedUser.id,
+                                            reported_username: reportedUser.username,
+                                            target_model: "project",
+                                            target_id: activeConv.project.id,
+                                            title: `Issue regarding project: ${activeConv.project.title}`,
+                                            report_type: "CHAT"
+                                        }
+                                    });
+                                }}
+                                className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-bold hover:bg-red-100 transition-colors flex items-center gap-1.5"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><line x1="4" y1="22" x2="4" y2="15" /></svg>
+                                Report
+                            </button>
+                        )}
                     </div>
                     {wsError && <span className="text-xs text-red-500">{wsError}</span>}
                 </div>

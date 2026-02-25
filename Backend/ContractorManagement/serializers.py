@@ -16,6 +16,9 @@ class ContractorSerializer(serializers.ModelSerializer):
     avgRating = serializers.SerializerMethodField()
     totalRatings = serializers.SerializerMethodField()
 
+    isActive = serializers.BooleanField(source="user.is_active", required=False)
+    dateJoined = serializers.DateTimeField(source="user.date_joined", read_only=True)
+
     class Meta:
         model = Contractor
         fields = [
@@ -30,9 +33,21 @@ class ContractorSerializer(serializers.ModelSerializer):
             "phone",
             "availabilityStatus",
             "rateType",
+            "isActive",
+            "dateJoined",
             "avgRating",
             "totalRatings",
         ]
+
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop("user", {})
+        is_active = user_data.get("is_active")
+        
+        if is_active is not None and instance.user:
+            instance.user.is_active = is_active
+            instance.user.save()
+            
+        return super().update(instance, validated_data)
 
     def _rating_qs(self, obj: Contractor):
         if not obj.user_id:

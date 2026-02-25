@@ -235,6 +235,14 @@ export default function ContractorDashboard() {
               navigate("/messages");
               return;
             }
+            if (key === "report-issue") {
+              navigate("/support/report");
+              return;
+            }
+            if (key === "my-issues") {
+              navigate("/support/my-issues");
+              return;
+            }
             setActiveMenu(key);
           }}
         />

@@ -19,6 +19,7 @@ urlpatterns = [
     path("api/", include("ContractorManagement.urls")),
     path("api/chat/", include("ChatSystem.urls")),
     path("api/", include("CostEstimation.urls")),
+    path("api/", include("IssueSystem.urls")),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
         "api/docs/swagger/",

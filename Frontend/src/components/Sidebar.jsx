@@ -15,6 +15,8 @@ export default function Sidebar({ role, activeMenu, onItemClick }) {
         { key: "my-projects", label: "My Projects", path: "/clientdashboard" },
         { key: "project-bids", label: "Project Bids", path: "/clientdashboard" },
         { key: "messages", label: "Messages", path: "/messages" },
+        { key: "report-issue", label: "Report Issue", path: "/support/report" },
+        { key: "my-issues", label: "My Issues", path: "/support/my-issues" },
         { key: "profile", label: "Profile", path: "/clientdashboard" },
     ];
 
@@ -24,6 +26,8 @@ export default function Sidebar({ role, activeMenu, onItemClick }) {
         { key: "bids", label: "My Bids", path: "/contractor" },
         { key: "ratings", label: "Ratings", path: "/contractor" },
         { key: "messages", label: "Messages", path: "/messages" },
+        { key: "report-issue", label: "Report Issue", path: "/support/report" },
+        { key: "my-issues", label: "My Issues", path: "/support/my-issues" },
     ];
 
     const items = role === "client" ? clientItems : contractorItems;

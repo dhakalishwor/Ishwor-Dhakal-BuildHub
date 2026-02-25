@@ -1,5 +1,6 @@
-from django.urls import path
+from django.urls import path, include
 from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework.routers import DefaultRouter
 from .views import (
     RegisterView, 
     RoleBasedTokenObtainPairView, 
@@ -7,6 +8,10 @@ from .views import (
     AdminLicenseListView,
     AdminLicenseReviewView
 )
+from .admin_views import AdminClientViewSet
+
+router = DefaultRouter()
+router.register(r'admin/clients', AdminClientViewSet, basename='admin-clients')
 
 urlpatterns = [
     path("register/", RegisterView.as_view(), name="register"),
@@ -18,4 +23,7 @@ urlpatterns = [
     # Admin URLs
     path("admin/licenses/", AdminLicenseListView.as_view(), name="admin_license_list"),
     path("admin/licenses/<int:pk>/review/", AdminLicenseReviewView.as_view(), name="admin_license_review"),
+    
+    # Include router URLs
+    path("", include(router.urls)),
 ]

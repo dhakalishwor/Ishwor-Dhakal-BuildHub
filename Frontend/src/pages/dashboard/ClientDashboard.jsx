@@ -399,6 +399,14 @@ export default function ClientDashboard() {
               navigate("/messages");
               return;
             }
+            if (key === "report-issue") {
+              navigate("/support/report");
+              return;
+            }
+            if (key === "my-issues") {
+              navigate("/support/my-issues");
+              return;
+            }
             setActiveMenu(key);
             if (key !== "my-projects") setRecommendedContractors([]);
           }}

@@ -47,10 +47,16 @@ api.interceptors.response.use(
         const res = await axios.post(`${baseURL}/auth/token/refresh/`, {
           refresh: refreshToken,
         });
-        
+
         localStorage.setItem("accessToken", res.data.access);
         originalRequest.headers.Authorization = `Bearer ${res.data.access}`;
-        
+
+        // If the original request was a multipart/form-data (FormData), 
+        // we must clear the Content-Type header so axios can regenerate the boundary.
+        if (originalRequest.data instanceof FormData) {
+          delete originalRequest.headers["Content-Type"];
+        }
+
         // Retry the original request with new token
         return api(originalRequest);
       } catch (refreshError) {

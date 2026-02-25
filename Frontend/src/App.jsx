@@ -15,6 +15,8 @@ import EsewaFailure from "./pages/payments/EsewaFailure";
 import EsewaSuccess from "./pages/payments/EsewaSuccess";
 import WorkerDashboard from "./pages/dashboard/WorkerDashboard";
 import MessagesPage from "./pages/message/MessagesPage";
+import ReportIssue from "./pages/support/ReportIssue";
+import MyIssues from "./pages/support/MyIssues";
 
 function App() {
   return (
@@ -35,6 +37,8 @@ function App() {
       <Route path="/payment/esewa/success" element={<EsewaSuccess />} />
       <Route path="/payment/esewa/failure" element={<EsewaFailure />} />
       <Route path="/messages" element={<MessagesPage />} />
+      <Route path="/support/report" element={<ReportIssue />} />
+      <Route path="/support/my-issues" element={<MyIssues />} />
     </Routes>
   );
 }
