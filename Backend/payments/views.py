@@ -154,6 +154,25 @@ class PaymentVerifyView(APIView):
 
         return Response({"detail": "Payment verified successfully"}, status=200)
 
+class WorkerPaymentsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Return payments for projects where the user is the assigned contractor
+        payments = Payment.objects.filter(project__assigned_contractor=request.user).order_by("-created_at")
+        
+        # We can simplify the response or use a serializer
+        data = []
+        for p in payments:
+            data.append({
+                "id": p.id,
+                "project_title": p.project.title,
+                "amount": p.amount,
+                "status": p.status,
+                "date": p.created_at.strftime("%Y-%m-%d"),
+            })
+        return Response(data)
+
 class PaymentFailureView(APIView):
     permission_classes = [AllowAny]
 

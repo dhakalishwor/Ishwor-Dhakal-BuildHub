@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import _api from "../../API/axios";
 import AdminIssueManagement from "./AdminIssueManagement";
+import AdminProjectMonitoring from "./AdminProjectMonitoring";
 
 
 const initialForm = {
@@ -328,6 +329,23 @@ export default function App() {
               </div>
               <p className="mt-1 text-xs text-emerald-200">
                 Manage client accounts
+              </p>
+            </button>
+
+            <button
+              onClick={() => setActiveMenu("monitoring")}
+              className={classNames(
+                "mt-3 w-full rounded-xl px-4 py-3 text-left transition",
+                activeMenu === "monitoring"
+                  ? "bg-emerald-700 text-white shadow"
+                  : "bg-emerald-900 hover:bg-emerald-800"
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">Project Monitoring</span>
+              </div>
+              <p className="mt-1 text-xs text-emerald-200">
+                Oversight of all active work
               </p>
             </button>
 
@@ -793,6 +811,10 @@ export default function App() {
                   </div>
                 </section>
               </div>
+            )}
+
+            {activeMenu === "monitoring" && (
+              <AdminProjectMonitoring />
             )}
 
             {activeMenu === "issues" && (

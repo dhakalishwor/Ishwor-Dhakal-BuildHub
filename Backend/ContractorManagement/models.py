@@ -74,3 +74,34 @@ class Contractor(models.Model):
 
     def __str__(self):
         return self.full_name
+
+
+class WorkerProfile(models.Model):
+    AVAILABILITY_CHOICES = (
+        ("AVAILABLE", "Available"),
+        ("BUSY", "Busy"),
+        ("UNAVAILABLE", "Unavailable"),
+    )
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="worker_profile",
+        limit_choices_to={"role": "worker"},
+    )
+    full_name = models.CharField(max_length=255)
+    skills = models.TextField(help_text="Comma-separated skills")
+    daily_rate = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    availability_status = models.CharField(
+        max_length=20,
+        choices=AVAILABILITY_CHOICES,
+        default="AVAILABLE",
+    )
+    phone = models.CharField(max_length=20)
+    address = models.CharField(max_length=200, blank=True, default="")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.full_name} ({self.user.username})"

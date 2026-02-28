@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     "ChatSystem",
     "CostEstimation",
     "IssueSystem",
+    "ProgressTracking",
 ]
 
 AUTH_USER_MODEL = "Authentication.User"

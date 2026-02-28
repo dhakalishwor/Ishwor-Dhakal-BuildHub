@@ -2,11 +2,15 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../../API/axios";
 
+// utility to combine class names conditionally (mimics common classNames helper)
+function classNames(...classes) {
+  return classes.filter(Boolean).join(" ");
+}
+
 import PostProject from "../client/PostProject";
 import ProjectBids from "../client/ProjectBids";
 import CostEstimator from "../client/CostEstimator";
 import Sidebar from "../../components/Sidebar";
-
 
 function normalizeProject(p) {
   return {
@@ -21,6 +25,8 @@ function normalizeProject(p) {
     rated: !!p.rating,
     payment_status: p.payment_status || "UNPAID",
     final_amount: p.final_amount ?? null,
+    hiring_model: p.hiring_model || "PER_PROJECT",
+    daily_rate: p.daily_rate || null,
   };
 }
 
@@ -130,6 +136,250 @@ function RateProject({ projectId, onDone }) {
   );
 }
 
+function MonitoringView({ projects }) {
+  const [workLogs, setWorkLogs] = useState([]);
+  const [milestones, setMilestones] = useState([]);
+  const [projectUpdates, setProjectUpdates] = useState([]);
+  const [, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchLogs();
+    fetchProjectUpdates();
+  }, []);
+
+  async function fetchLogs() {
+    setLoading(true);
+    try {
+      const [logRes, milRes] = await Promise.all([
+        api.get("/api/work-logs/"),
+        api.get("/api/milestones/")
+      ]);
+      setWorkLogs(logRes.data);
+      setMilestones(milRes.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function fetchProjectUpdates() {
+    try {
+      const res = await api.get("/api/progress-updates/");
+      setProjectUpdates(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function handleApproveProjectUpdate(updateId) {
+    try {
+      await api.post(`/api/progress-updates/${updateId}/approve/`);
+      fetchProjectUpdates();
+      alert("Progress update approved!");
+    // eslint-disable-next-line no-unused-vars
+    } catch (err) {
+      alert("Failed to approve update.");
+    }
+  }
+
+  async function handleRejectProjectUpdate(updateId) {
+    const reason = window.prompt("Enter rejection reason:");
+    if (reason === null) return;
+    try {
+      await api.post(`/api/progress-updates/${updateId}/reject/`, { rejection_reason: reason });
+      fetchProjectUpdates();
+      alert("Progress update rejected.");
+    // eslint-disable-next-line no-unused-vars
+    } catch (err) {
+      alert("Failed to reject update.");
+    }
+  }
+
+  async function handleUpdateLogStatus(logId, status) {
+    try {
+      await api.post(`/api/work-logs/${logId}/${status.toLowerCase()}/`);
+      fetchLogs();
+      alert(`Work log ${status.toLowerCase()}d!`);
+    // eslint-disable-next-line no-unused-vars
+    } catch (err) {
+      alert("Failed to update status.");
+    }
+  }
+
+  async function handleUpdateMilestoneStatus(milestoneId, status) {
+    try {
+      await api.patch(`/api/milestones/${milestoneId}/`, { status: status });
+      fetchLogs();
+      alert(`Milestone ${status.toLowerCase()}!`);
+    // eslint-disable-next-line no-unused-vars
+    } catch (err) {
+      alert("Failed to update milestone.");
+    }
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto">
+      <h1 className="text-2xl font-bold text-emerald-900 mb-6">Monitor Progress</h1>
+
+      <div className="space-y-8">
+        <section>
+          <h2 className="text-lg font-bold text-slate-700 mb-4">Pending Work Logs (Per Day Basis)</h2>
+          <div className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+            <table className="w-full text-left text-sm text-slate-500">
+              <thead className="bg-slate-50 text-xs uppercase text-slate-700">
+                <tr>
+                  <th className="px-6 py-3">Date</th>
+                  <th className="px-6 py-3">Worker</th>
+                  <th className="px-6 py-3">Hours</th>
+                  <th className="px-6 py-3">Description</th>
+                  <th className="px-6 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {workLogs.filter(l => l.status === "PENDING").map((log, idx) => (
+                  <tr key={`log-${log.id}-${idx}`}>
+                    <td className="px-6 py-4">{log.date}</td>
+                    <td className="px-6 py-4">{log.worker_username}</td>
+                    <td className="px-6 py-4 font-bold">{log.hours_worked}</td>
+                    <td className="px-6 py-4">{log.description}</td>
+                    <td className="px-6 py-4 flex gap-2">
+                      <button
+                        onClick={() => handleUpdateLogStatus(log.id, "APPROVE")}
+                        className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleUpdateLogStatus(log.id, "REJECT")}
+                        className="rounded-lg bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700"
+                      >
+                        Reject
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {workLogs.filter(l => l.status === "PENDING").length === 0 && (
+                  <tr>
+                    <td colSpan="5" className="px-6 py-4 text-center text-slate-400 italic">No pending logs found.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-bold text-slate-700 mb-4">Milestones (Fixed Price Project)</h2>
+          <div className="grid gap-4">
+            {projects.filter(p => p.hiring_model === "PER_PROJECT" && p.status === "ACTIVE").map(p => {
+              const projMilestones = milestones.filter(m => m.project === p.id);
+              return (
+                <div key={`project-${p.id}`} className="rounded-2xl border bg-white p-6 shadow-sm">
+                  <h3 className="font-bold text-emerald-900">{p.title}</h3>
+                  <p className="text-sm text-slate-500 mt-1">Status: {p.status}</p>
+
+                  <div className="mt-4 space-y-2">
+                    {projMilestones.length === 0 ? (
+                      <p className="text-xs italic text-slate-400">No milestones defined for this project.</p>
+                    ) : (
+                      projMilestones.map((m, idx2) => (
+                        <div key={`milestone-${m.id}-${idx2}`} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-dashed">
+                          <div>
+                            <p className="text-sm font-semibold">{m.title}</p>
+                            <p className="text-xs text-slate-500">NPR {m.amount} • {m.status}</p>
+                          </div>
+                          {m.status === "COMPLETED" && (
+                            <button
+                              onClick={() => handleUpdateMilestoneStatus(m.id, "PAID")}
+                              className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700"
+                            >
+                              Approve & Pay
+                            </button>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {projects.filter(p => p.hiring_model === "PER_PROJECT" && p.status === "ACTIVE").length === 0 && (
+              <p className="text-slate-400 italic">No active milestones-based projects.</p>
+            )}
+          </div>
+        </section>
+        <section>
+          <h2 className="text-lg font-bold text-slate-700 mb-4">Project Progress Updates (Review Evidence)</h2>
+          <div className="space-y-4">
+            {projectUpdates.map((up, idx) => (
+              <div key={`update-${up.id}-${idx}`} className="rounded-2xl border bg-white p-6 shadow-sm">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-bold text-emerald-900">Project #{up.project}</h3>
+                    <p className="text-xs text-slate-500">Posted by {up.posted_by_username} on {new Date(up.created_at).toLocaleString()}</p>
+                  </div>
+                  <span className={classNames(
+                    "rounded-full px-2 py-1 text-[10px] font-bold uppercase",
+                    up.status === "APPROVED" ? "bg-emerald-100 text-emerald-700" :
+                      up.status === "REJECTED" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"
+                  )}>
+                    {up.status}
+                  </span>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-[1fr_200px] gap-6">
+                  <div>
+                    <p className="text-sm text-slate-700 whitespace-pre-line italic">"{up.description}"</p>
+                    {up.rejection_reason && (
+                      <p className="mt-2 text-xs text-red-600"><b>Rejection Reason:</b> {up.rejection_reason}</p>
+                    )}
+
+                    {up.status === "PENDING" && (
+                      <div className="mt-6 flex gap-3">
+                        <button
+                          onClick={() => handleApproveProjectUpdate(up.id)}
+                          className="rounded-lg bg-emerald-700 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-800"
+                        >
+                          Approve Progress
+                        </button>
+                        <button
+                          onClick={() => handleRejectProjectUpdate(up.id)}
+                          className="rounded-lg border border-red-200 px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-50"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  {up.photo && (
+                    <div className="relative group">
+                      <img
+                        src={up.photo}
+                        alt="Evidence"
+                        className="w-full h-40 object-cover rounded-xl border cursor-pointer hover:opacity-90 transition"
+                        onClick={() => window.open(up.photo, '_blank')}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
+                        <span className="bg-black/50 text-white text-[10px] px-2 py-1 rounded">View Full Image</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+            {projectUpdates.length === 0 && (
+              <div className="text-center py-12 rounded-2xl border bg-slate-50 border-dashed">
+                <p className="text-slate-400 italic text-sm">No project progress updates to review.</p>
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
 function MyProjectsView({
   projects,
   loading,
@@ -203,7 +453,7 @@ function MyProjectsView({
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <span className="text-xs px-3 py-1 rounded-full bg-emerald-100 text-emerald-900">
+                    <span className="text-xs px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 uppercase">
                       {p.status}
                     </span>
 
@@ -220,9 +470,10 @@ function MyProjectsView({
                 </div>
 
                 <p className="mt-3 text-sm text-slate-700">{p.description}</p>
-                <p className="mt-2 text-sm">
-                  Budget: <b>{p.budget}</b>
-                </p>
+                <div className="mt-2 flex gap-4 text-sm">
+                  <p>Budget: <b>NPR {p.budget}</b></p>
+                  <p>Model: <b className="uppercase">{p.hiring_model}</b></p>
+                </div>
 
                 {p.status === "COMPLETED" && p.payment_status !== "PAID" && (
                   <div className="mt-3 rounded-xl border border-yellow-200 bg-yellow-50 p-3">
@@ -541,6 +792,8 @@ export default function ClientDashboard() {
           )}
 
           {activeMenu === "project-bids" && <ProjectBids onDone={() => setActiveMenu("dashboard")} />}
+
+          {activeMenu === "monitoring" && <MonitoringView projects={projects} />}
 
           {activeMenu === "profile" && (
             <div className="rounded-2xl border bg-white p-8 shadow-sm">

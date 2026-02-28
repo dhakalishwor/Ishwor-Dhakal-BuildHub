@@ -25,6 +25,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             "rating",
             "payment_status",
             "final_amount",
+            "hiring_model",
+            "daily_rate",
         ]
         read_only_fields = ["id", "status", "created_at", "assigned_contractor", "rating"]
 

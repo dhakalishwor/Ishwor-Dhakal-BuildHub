@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.db.models import Avg, Count
-from .models import Contractor
+from .models import Contractor, WorkerProfile
 from RecommendationSystem.models import Project
 
 class ContractorSerializer(serializers.ModelSerializer):
@@ -67,3 +67,24 @@ class ContractorSerializer(serializers.ModelSerializer):
     def get_totalRatings(self, obj):
         agg = self._rating_qs(obj).aggregate(cnt=Count("rating"))
         return int(agg["cnt"] or 0)
+
+
+class WorkerProfileSerializer(serializers.ModelSerializer):
+    fullName = serializers.CharField(source="full_name")
+    availabilityStatus = serializers.CharField(source="availability_status", required=False)
+    dailyRate = serializers.DecimalField(source="daily_rate", max_digits=10, decimal_places=2, required=False)
+    username = serializers.CharField(source="user.username", read_only=True)
+
+    class Meta:
+        model = WorkerProfile
+        fields = [
+            "id",
+            "username",
+            "fullName",
+            "skills",
+            "dailyRate",
+            "availabilityStatus",
+            "phone",
+            "address",
+            "created_at",
+        ]

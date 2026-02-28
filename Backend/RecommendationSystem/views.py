@@ -12,6 +12,8 @@ from .permissions import IsProjectOwner
 
 from ContractorManagement.models import Contractor
 from ContractorManagement.serializers import ContractorSerializer
+from ProgressTracking.models import ProjectAssignment, WorkLog
+from BiddingSystem.models import Bid
 
 
 User = get_user_model()
@@ -28,9 +30,20 @@ class ProjectViewSet(ModelViewSet):
         if role == "CLIENT":
             return Project.objects.filter(client=user).order_by("-created_at")
 
-        if role == "CONTRACTOR":
+        if role in ["CONTRACTOR", "WORKER"]:
+            discovery = self.request.query_params.get('discovery') == 'true'
+            if role == "WORKER" and discovery:
+                # show only active projects that the worker has not yet bid on or logged work for
+                bid_projects = Bid.objects.filter(contractor=user).values_list('project_id', flat=True)
+                log_projects = WorkLog.objects.filter(worker=user).values_list('project_id', flat=True)
+                return Project.objects.filter(status="ACTIVE").exclude(id__in=bid_projects).exclude(id__in=log_projects).order_by("-created_at")
+
+            assigned_projects = ProjectAssignment.objects.filter(worker=user).values_list('project_id', flat=True)
             return Project.objects.filter(
-                models.Q(status="BIDDING") | models.Q(assigned_contractor=user)
+                models.Q(status="BIDDING") | 
+                models.Q(assigned_contractor=user, status="ACTIVE") |
+                models.Q(assigned_contractor=user, status="COMPLETED") |
+                models.Q(id__in=assigned_projects)
             ).distinct().order_by("-created_at")
 
         return Project.objects.none()

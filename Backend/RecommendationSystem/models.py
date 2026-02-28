@@ -27,6 +27,11 @@ class Project(models.Model):
         ("ESEWA", "eSewa"),
     ]
 
+    HIRING_MODEL_CHOICES = [
+        ("PER_DAY", "Per Day"),
+        ("PER_PROJECT", "Per Project"),
+    ]
+
     client = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -53,6 +58,20 @@ class Project(models.Model):
     end_date = models.DateField(null=True, blank=True)
 
     status = models.CharField(max_length=15, choices=STATUS_CHOICES, default="BIDDING")
+    
+    hiring_model = models.CharField(
+        max_length=20, 
+        choices=HIRING_MODEL_CHOICES, 
+        default="PER_PROJECT"
+    )
+    daily_rate = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        null=True, 
+        blank=True,
+        help_text="Daily rate if hiring model is Per Day"
+    )
+    
     created_at = models.DateTimeField(auto_now_add=True)
 
     payment_status = models.CharField(

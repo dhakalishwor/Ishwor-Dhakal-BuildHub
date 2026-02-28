@@ -4,15 +4,15 @@ from .models import Bid
 class BidCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Bid
-        fields = ["id", "project", "proposed_price", "proposed_days", "message"]
+        fields = ["id", "project", "proposed_price", "proposed_days", "daily_rate", "message"]
 
     def validate(self, attrs):
         request = self.context["request"]
         user = request.user
 
         # role check
-        if getattr(user, "role", None) != "contractor":
-            raise serializers.ValidationError("Only contractors can place bids.")
+        if getattr(user, "role", None) not in ["contractor", "worker"]:
+            raise serializers.ValidationError("Only contractors or workers can place bids.")
 
         project = attrs.get("project")
 
@@ -34,7 +34,7 @@ class BidListSerializer(serializers.ModelSerializer):
         model = Bid
         fields = [
             "id", "project", "contractor", "contractor_name",
-            "proposed_price", "proposed_days", "message",
+            "proposed_price", "proposed_days", "daily_rate", "message",
             "status", "created_at"
         ]
 

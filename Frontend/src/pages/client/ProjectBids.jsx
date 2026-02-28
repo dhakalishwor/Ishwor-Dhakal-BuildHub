@@ -119,7 +119,7 @@ export default function ProjectBids({ onDone, onChatStarted }) {
               {projects.map((project) => (
                 <button
                   type="button"
-                  key={project.id}
+                  key={`project-${project.id}`}
                   onClick={() => fetchBids(project.id)}
                   className={[
                     "w-full text-left border rounded-xl p-4 cursor-pointer transition-all",
@@ -157,7 +157,7 @@ export default function ProjectBids({ onDone, onChatStarted }) {
           ) : (
             <div className="space-y-4">
               {bids.map((bid) => (
-                <div key={bid.id} className="border rounded-xl p-4 bg-gray-50">
+                <div key={`bid-${bid.id}`} className="border rounded-xl p-4 bg-gray-50">
                   <div className="flex justify-between items-start mb-3 gap-3">
                     <div>
                       <p className="font-semibold text-emerald-900">

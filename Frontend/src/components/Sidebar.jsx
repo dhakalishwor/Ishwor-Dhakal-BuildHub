@@ -10,6 +10,7 @@ export default function Sidebar({ role, activeMenu, onItemClick }) {
 
     const clientItems = [
         { key: "dashboard", label: "Dashboard", path: "/clientdashboard" },
+        { key: "monitoring", label: "Monitor Progress", path: "/clientdashboard" },
         { key: "estimate", label: "Cost Estimation", path: "/clientdashboard" },
         { key: "postproject", label: "Post Project", path: "/clientdashboard" },
         { key: "my-projects", label: "My Projects", path: "/clientdashboard" },
@@ -24,6 +25,10 @@ export default function Sidebar({ role, activeMenu, onItemClick }) {
         { key: "profile", label: "Manage Profile", path: "/contractor" },
         { key: "projects", label: "Available Projects", path: "/contractor" },
         { key: "bids", label: "My Bids", path: "/contractor" },
+        { key: "manage-tasks", label: "Manage Tasks", path: "/contractor" },
+        { key: "manage-team", label: "Manage Team", path: "/contractor" },
+        { key: "sub-job-apps", label: "Sub-Job Applications", path: "/contractor" },
+        { key: "hire-workers", label: "Hire Workers", path: "/contractor" },
         { key: "ratings", label: "Ratings", path: "/contractor" },
         { key: "messages", label: "Messages", path: "/messages" },
         { key: "report-issue", label: "Report Issue", path: "/support/report" },

@@ -26,6 +26,8 @@ const initialForm = {
   endDate: "",
   latitude: null,
   longitude: null,
+  hiring_model: "PER_PROJECT",
+  daily_rate: "",
 };
 
 function LocationMarker({ position, setPosition }) {
@@ -87,9 +89,14 @@ export default function PostProject({ onCreated, onDone }) {
         location,
         description,
         budget: budgetNum,
+        hiring_model: form.hiring_model,
         latitude: form.latitude ? parseFloat(form.latitude.toFixed(9)) : null,
         longitude: form.longitude ? parseFloat(form.longitude.toFixed(9)) : null,
       };
+
+      if (form.hiring_model === "PER_DAY" && form.daily_rate) {
+        payload.daily_rate = Number(form.daily_rate);
+      }
 
       if (form.startDate) payload.start_date = form.startDate;
       if (form.endDate) payload.end_date = form.endDate;
@@ -164,28 +171,30 @@ export default function PostProject({ onCreated, onDone }) {
             required
           />
 
-          <select
-            name="category"
-            value={form.category}
-            onChange={onChange}
-            className="w-full border rounded-xl px-4 py-2"
-          >
-            <option value="CIVIL">Civil</option>
-            <option value="ELECTRICAL">Electrical</option>
-            <option value="PLUMBING">Plumbing</option>
-            <option value="INTERIOR">Interior</option>
-            <option value="PAINTING">Painting</option>
-            <option value="OTHER">Other</option>
-          </select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <select
+              name="category"
+              value={form.category}
+              onChange={onChange}
+              className="w-full border rounded-xl px-4 py-2"
+            >
+              <option value="CIVIL">Civil</option>
+              <option value="ELECTRICAL">Electrical</option>
+              <option value="PLUMBING">Plumbing</option>
+              <option value="INTERIOR">Interior</option>
+              <option value="PAINTING">Painting</option>
+              <option value="OTHER">Other</option>
+            </select>
 
-          <input
-            name="location"
-            placeholder="Location (City, Area)"
-            value={form.location}
-            onChange={onChange}
-            className="w-full border rounded-xl px-4 py-2"
-            required
-          />
+            <input
+              name="location"
+              placeholder="Location (City, Area)"
+              value={form.location}
+              onChange={onChange}
+              className="w-full border rounded-xl px-4 py-2"
+              required
+            />
+          </div>
 
           <div className="space-y-2">
             <label className="text-sm font-semibold text-slate-700">
@@ -222,30 +231,66 @@ export default function PostProject({ onCreated, onDone }) {
             required
           />
 
-          <input
-            name="budget"
-            placeholder="Budget"
-            value={form.budget}
-            onChange={onChange}
-            className="w-full border rounded-xl px-4 py-2"
-            required
-          />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="md:col-span-1">
+              <label className="text-xs text-slate-500 uppercase">Hiring Model</label>
+              <select
+                name="hiring_model"
+                value={form.hiring_model}
+                onChange={onChange}
+                className="mt-1 w-full border rounded-xl px-4 py-2"
+              >
+                <option value="PER_PROJECT">Per Project (Fixed)</option>
+                <option value="PER_DAY">Per Day (Daily Rate)</option>
+              </select>
+            </div>
+            <div className="md:col-span-1">
+              <label className="text-xs text-slate-500 uppercase">Estimated Budget</label>
+              <input
+                name="budget"
+                placeholder="Budget"
+                value={form.budget}
+                onChange={onChange}
+                className="mt-1 w-full border rounded-xl px-4 py-2"
+                required
+              />
+            </div>
+            {form.hiring_model === "PER_DAY" && (
+              <div className="md:col-span-1">
+                <label className="text-xs text-slate-500 uppercase">Daily Rate (NPR)</label>
+                <input
+                  name="daily_rate"
+                  placeholder="Daily Rate"
+                  value={form.daily_rate}
+                  onChange={onChange}
+                  className="mt-1 w-full border rounded-xl px-4 py-2"
+                  required={form.hiring_model === "PER_DAY"}
+                />
+              </div>
+            )}
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input
-              type="date"
-              name="startDate"
-              value={form.startDate}
-              onChange={onChange}
-              className="w-full border rounded-xl px-4 py-2"
-            />
-            <input
-              type="date"
-              name="endDate"
-              value={form.endDate}
-              onChange={onChange}
-              className="w-full border rounded-xl px-4 py-2"
-            />
+            <div>
+              <label className="text-xs text-slate-500 uppercase">Start Date</label>
+              <input
+                type="date"
+                name="startDate"
+                value={form.startDate}
+                onChange={onChange}
+                className="mt-1 w-full border rounded-xl px-4 py-2"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 uppercase">End Date</label>
+              <input
+                type="date"
+                name="endDate"
+                value={form.endDate}
+                onChange={onChange}
+                className="mt-1 w-full border rounded-xl px-4 py-2"
+              />
+            </div>
           </div>
 
           <div className="flex justify-end">
