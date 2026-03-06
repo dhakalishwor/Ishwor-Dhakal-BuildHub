@@ -12,6 +12,7 @@ from RecommendationSystem.models import Project
 from BiddingSystem.models import Bid
 from .models import Payment
 from .utils import esewa_generate_signature
+from NotificationSystem.utils import notify
 
 def _get_esewa_settings():
     product_code = getattr(settings, "ESEWA_PRODUCT_CODE", "")
@@ -61,6 +62,15 @@ class InitiatePaymentView(APIView):
                 "transaction_uuid": transaction_uuid,
                 "status": "INITIATED",
             },
+        )
+
+        # Notify client that payment process has started
+        notify(
+            user=request.user,
+            title="Payment Initiated",
+            message=f"You started a payment of Rs {amount} for project \"{project.title}\". Complete the process on eSewa.",
+            type="PAYMENT",
+            link=f"/client/projects?project={project.id}",
         )
 
         tax_amount = 0
@@ -140,6 +150,15 @@ class PaymentVerifyView(APIView):
         if payload["status"].upper() != "COMPLETE":
             payment.status = "FAILED"
             payment.save()
+
+            # Notify client about payment failure
+            notify(
+                user=payment.client,
+                title="Payment Failed",
+                message=f"Your payment for project \"{project.title}\" could not be completed. Please try again.",
+                type="PAYMENT",
+                link=f"/clientdashboard?menu=my-projects&project={project.id}",
+            )
             return Response({"detail": "Payment not completed"}, status=400)
 
         payment.status = "COMPLETE"
@@ -151,6 +170,25 @@ class PaymentVerifyView(APIView):
         project.paid_at = now()
         project.final_amount = payment.amount
         project.save()
+
+        # Notify client — payment confirmed
+        notify(
+            user=payment.client,
+            title="Payment Successful ✅",
+            message=f"Your payment of Rs {payment.amount} for project \"{project.title}\" was successful.",
+            type="PAYMENT",
+            link=f"/client/projects?project={project.id}",
+        )
+
+        # Notify assigned contractor — payment received
+        if project.assigned_contractor:
+            notify(
+                user=project.assigned_contractor,
+                title="Payment Received",
+                message=f"The client has paid Rs {payment.amount} for project \"{project.title}\".",
+                type="PAYMENT",
+                link=f"/contractor?menu=bids&project={project.id}",
+            )
 
         return Response({"detail": "Payment verified successfully"}, status=200)
 
@@ -176,8 +214,25 @@ class WorkerPaymentsView(APIView):
 class PaymentFailureView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, request):
+    def _handle_cancel(self, request):
+        # Try to notify the client if we can identify the transaction
+        transaction_uuid = request.query_params.get("oid") or request.data.get("transaction_uuid")
+        if transaction_uuid:
+            payment = Payment.objects.filter(transaction_uuid=transaction_uuid).first()
+            if payment and payment.status == "INITIATED":
+                payment.status = "CANCELLED"
+                payment.save(update_fields=["status"])
+                notify(
+                    user=payment.client,
+                    title="Payment Cancelled",
+                    message=f"Your payment for project \"{payment.project.title}\" was cancelled.",
+                    type="PAYMENT",
+                    link=f"/clientdashboard?menu=my-projects&project={payment.project.id}",
+                )
         return Response({"detail": "Payment cancelled"}, status=200)
 
+    def get(self, request):
+        return self._handle_cancel(request)
+
     def post(self, request):
-        return Response({"detail": "Payment cancelled"}, status=200)
+        return self._handle_cancel(request)

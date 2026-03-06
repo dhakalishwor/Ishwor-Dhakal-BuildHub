@@ -8,6 +8,7 @@ from .models import Bid
 from .serializers import BidCreateSerializer, BidListSerializer, BidStatusUpdateSerializer
 from .permission import IsContractor, IsClient
 from RecommendationSystem.models import Project
+from NotificationSystem.utils import notify
 
 
 class BidCreateView(generics.CreateAPIView):
@@ -15,7 +16,18 @@ class BidCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated, IsContractor]
 
     def perform_create(self, serializer):
-        serializer.save(contractor=self.request.user)
+        bid = serializer.save(contractor=self.request.user)
+        project = bid.project
+        contractor = self.request.user
+
+        # Notify client that a new bid was placed on their project
+        notify(
+            user=project.client,
+            title="New Bid Received",
+            message=f"{contractor.username} placed a bid of Rs {bid.proposed_price} on your project \"{project.title}\".",
+            type="BID",
+            link=f"/clientdashboard?menu=project-bids&project={project.id}",
+        )
 
 
 class MyBidsView(generics.ListAPIView):
@@ -70,8 +82,57 @@ class UpdateBidStatusView(generics.UpdateAPIView):
             project.status = "ACTIVE"
             project.save()
 
+            # Notify winning contractor their bid was accepted
+            notify(
+                user=bid.contractor,
+                title="Bid Accepted 🎉",
+                message=f"Your bid on \"{project.title}\" has been accepted! You are now the assigned contractor.",
+                type="BID",
+                link="/contractor?menu=bids",
+            )
+
         elif new_status == "REJECTED":
             bid.status = "REJECTED"
             bid.save()
 
+            # Notify contractor their bid was rejected
+            notify(
+                user=bid.contractor,
+                title="Bid Rejected",
+                message=f"Your bid on \"{project.title}\" was not accepted by the client.",
+                type="BID",
+                link=f"/contractor?menu=projects&project={project.id}",
+            )
+
         return Response({"detail": f"Bid {bid.id} updated to {bid.status}."}, status=status.HTTP_200_OK)
+
+
+class WithdrawBidView(generics.UpdateAPIView):
+    """Contractor withdraws their own bid → notifies client."""
+    permission_classes = [IsAuthenticated, IsContractor]
+    queryset = Bid.objects.all()
+
+    def update(self, request, *args, **kwargs):
+        bid = get_object_or_404(Bid, pk=kwargs["pk"], contractor=request.user)
+
+        if bid.status != "PENDING":
+            return Response(
+                {"detail": "Only a PENDING bid can be withdrawn."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        bid.status = "WITHDRAWN"
+        bid.save(update_fields=["status"])
+
+        project = bid.project
+
+        # Notify client that the contractor withdrew their bid
+        notify(
+            user=project.client,
+            title="Bid Withdrawn",
+            message=f"{request.user.username} has withdrawn their bid on \"{project.title}\".",
+            type="BID",
+            link=f"/clientdashboard?menu=project-bids&project={project.id}",
+        )
+
+        return Response({"detail": "Bid withdrawn successfully."}, status=status.HTTP_200_OK)

@@ -1,7 +1,9 @@
 import React, { useMemo, useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import _api from "../../API/axios";
 import AdminIssueManagement from "./AdminIssueManagement";
 import AdminProjectMonitoring from "./AdminProjectMonitoring";
+import NotificationBell from "../../components/NotificationBell";
 
 
 const initialForm = {
@@ -53,6 +55,8 @@ export default function App() {
   const [clientSearch, setClientSearch] = useState("");
   const [clientErrors, setClientErrors] = useState({});
   const [isLoadingClients, setIsLoadingClients] = useState(false);
+  
+  const [searchParams] = useSearchParams();
 
   // Fetch data on mount
   useEffect(() => {
@@ -62,7 +66,11 @@ export default function App() {
 
     // eslint-disable-next-line react-hooks/immutability
     fetchClients();
-  }, []);
+    
+    if (searchParams.get("issue")) {
+      setActiveMenu("issues");
+    }
+  }, [searchParams]);
 
   const fetchClients = () => {
     setIsLoadingClients(true);
@@ -287,6 +295,9 @@ export default function App() {
             <div>
               <p className="text-sm text-emerald-800 font-semibold">BuildHub Admin</p>
             </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <NotificationBell />
           </div>
         </div>
       </header>

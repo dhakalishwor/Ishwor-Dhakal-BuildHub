@@ -74,6 +74,7 @@ class ReportCreateSerializer(serializers.ModelSerializer):
 
         target_model = validated_data.pop("target_model", None)
         target_id = validated_data.pop("target_id", None)
+        validated_data.pop("reporter", None)
 
         ct = None
         if target_model and target_id:

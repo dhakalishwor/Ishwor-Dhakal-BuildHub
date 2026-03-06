@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import api from "../../API/axios"; // Use the custom api instance
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import DashboardLayout from "../../components/DashboardLayout";
 
 export default function MyIssues() {
@@ -8,6 +8,8 @@ export default function MyIssues() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [role, setRole] = useState("client");
+    const [searchParams] = useSearchParams();
+    const highlightIssueId = searchParams.get("issue");
 
     useEffect(() => {
         const storedRole = localStorage.getItem("role");
@@ -102,7 +104,10 @@ export default function MyIssues() {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {issues.length > 0 ? issues.map(issue => (
-                                <tr key={issue.id} className="hover:bg-emerald-50/30 transition-colors">
+                                <tr 
+                                    key={issue.id} 
+                                    className={`transition-colors ${highlightIssueId && issue.id.toString() === highlightIssueId ? "bg-emerald-100/50" : "hover:bg-emerald-50/30"}`}
+                                >
                                     <td className="px-6 py-6 text-sm font-bold text-slate-300">#{issue.id}</td>
                                     <td className="px-6 py-6">
                                         <p className="text-sm font-bold text-slate-800">{issue.title}</p>

@@ -73,10 +73,11 @@ INSTALLED_APPS = [
     "RatingSystem",
     "payments",
     "channels",
-    "ChatSystem",
+    "ChatSystem.apps.ChatSystemConfig",
     "CostEstimation",
     "IssueSystem",
     "ProgressTracking",
+    "NotificationSystem",
 ]
 
 AUTH_USER_MODEL = "Authentication.User"

@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import api from "../../API/axios";
 import AvailableProjects from "../Contractor/AvailableProjects";
 import MyBids from "../Contractor/MyBids";
 import MyRatings from "../Contractor/MyRatings";
 import Sidebar from "../../components/Sidebar";
+import NotificationBell from "../../components/NotificationBell";
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(" ");
@@ -26,6 +27,7 @@ export default function ContractorDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const [activeMenu, setActiveMenu] = useState("profile");
+  const [searchParams] = useSearchParams();
   const [profile, setProfile] = useState(emptyProfile);
   const [form, setForm] = useState(emptyProfile);
 
@@ -65,105 +67,127 @@ export default function ContractorDashboard() {
     return allProjectTypes.filter((t) => t.toLowerCase().includes(q));
   }, [searchType]);
 
-  useEffect(() => {
-    let mounted = true;
-
-    async function loadMe() {
-      setLoading(true);
-      setApiError("");
-      try {
-        const res = await api.get("/api/contractors/me/");
-        if (!mounted) return;
-
-        const data = res.data || {};
-        const normalized = {
-          fullName: data.fullName || "",
-          email: data.email || "",
-          address: data.address || "",
-          projectTypes: Array.isArray(data.projectTypes) ? data.projectTypes : [],
-          experienceYears:
-            data.experienceYears === 0 || data.experienceYears ? String(data.experienceYears) : "",
-          avgRating: typeof data.avgRating === "number" ? data.avgRating : Number(data.avgRating || 0),
-          totalRatings:
-            typeof data.totalRatings === "number"
-              ? data.totalRatings
-              : Number(data.totalRatings || 0),
-        };
-
-        setProfile(normalized);
-        setForm(normalized);
-      } catch (err) {
-        if (!mounted) return;
-
-        const status = err?.response?.status;
-        let msg = "Failed to load contractor profile. Please login again and check token.";
-
-        if (status === 401) msg = "Authentication failed. Please login again.";
-        else if (status === 403)
-          msg = err?.response?.data?.detail || "You don't have permission to access this resource.";
-        else if (status === 500) msg = "Server error. Please try again later.";
-        else if (err?.response?.data?.detail) msg = err.response.data.detail;
-        else if (err?.message) msg = err.message;
-
-        setApiError(msg);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    }
-
-    loadMe();
-
-    if (activeMenu === "hire-workers") {
-      fetchWorkers();
-      fetchActiveProjects();
-    }
-    if (activeMenu === "manage-team") {
-      fetchAssignments();
-    }
-    if (activeMenu === "sub-job-apps") {
-      fetchApplications();
-    }
-    if (activeMenu === "manage-tasks") {
-      fetchTasks();
-      fetchActiveProjects();
-      fetchAssignments(); // To get hired workers for assignment
-    }
-
-    if (location.state?.activeMenu) {
-      setActiveMenu(location.state.activeMenu);
-    }
-
-    return () => {
-      mounted = false;
-    };
-  }, [activeMenu, location.state?.activeMenu]);
-
-  async function fetchWorkers() {
+  const fetchWorkers = useCallback(async () => {
     try {
       const res = await api.get("/api/workers/");
       setWorkers(res.data);
     } catch (err) {
       console.error("Failed to fetch workers", err);
     }
-  }
+  }, []);
 
-  async function fetchActiveProjects() {
+  const fetchActiveProjects = useCallback(async () => {
     try {
       const res = await api.get("/api/projects/");
       setActiveProjects(res.data.filter(p => p.status === "ACTIVE"));
     } catch (err) {
       console.error("Failed to fetch projects", err);
     }
-  }
+  }, []);
 
-  async function fetchAssignments() {
+  const fetchAssignments = useCallback(async () => {
     try {
       const res = await api.get("/api/assignments/");
       setAssignments(res.data.filter(a => a.status === 'ACTIVE'));
     } catch (err) {
       console.error("Failed to fetch assignments", err);
     }
-  }
+  }, []);
+
+  const fetchApplications = useCallback(async () => {
+    try {
+      const res = await api.get("/api/sub-job-applications/");
+      setApplications(res.data);
+    } catch (err) {
+      console.error("Failed to fetch applications", err);
+    }
+  }, []);
+
+  const fetchTasks = useCallback(async () => {
+    try {
+      const res = await api.get("/api/tasks/");
+      setTasks(res.data);
+    } catch (err) {
+      console.error("Failed to fetch tasks", err);
+    }
+  }, []);
+
+  const loadMe = useCallback(async (mounted) => {
+    setLoading(true);
+    setApiError("");
+    try {
+      const res = await api.get("/api/contractors/me/");
+      if (!mounted) return;
+
+      const data = res.data || {};
+      const normalized = {
+        fullName: data.fullName || "",
+        email: data.email || "",
+        address: data.address || "",
+        projectTypes: Array.isArray(data.projectTypes) ? data.projectTypes : [],
+        experienceYears:
+          data.experienceYears === 0 || data.experienceYears ? String(data.experienceYears) : "",
+        avgRating: typeof data.avgRating === "number" ? data.avgRating : Number(data.avgRating || 0),
+        totalRatings:
+          typeof data.totalRatings === "number"
+            ? data.totalRatings
+            : Number(data.totalRatings || 0),
+      };
+
+      setProfile(normalized);
+      setForm(normalized);
+    } catch (err) {
+      if (!mounted) return;
+
+      const status = err?.response?.status;
+      let msg = "Failed to load contractor profile. Please login again and check token.";
+
+      if (status === 401) msg = "Authentication failed. Please login again.";
+      else if (status === 403)
+        msg = err?.response?.data?.detail || "You don't have permission to access this resource.";
+      else if (status === 500) msg = "Server error. Please try again later.";
+      else if (err?.response?.data?.detail) msg = err.response.data.detail;
+      else if (err?.message) msg = err.message;
+
+      setApiError(msg);
+    } finally {
+      if (mounted) setLoading(false);
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    let mounted = true;
+    loadMe(mounted);
+    return () => { mounted = false; };
+  }, [loadMe]);
+
+  // Handle menu changes and data fetching
+  useEffect(() => {
+    if (activeMenu === "hire-workers") {
+      fetchWorkers();
+      fetchActiveProjects();
+    } else if (activeMenu === "manage-team") {
+      fetchAssignments();
+    } else if (activeMenu === "sub-job-apps") {
+      fetchApplications();
+    } else if (activeMenu === "manage-tasks") {
+      fetchTasks();
+      fetchActiveProjects();
+      fetchAssignments();
+    }
+
+    // Guarded state updates for navigation
+    const stateMenu = location.state?.activeMenu;
+    if (stateMenu && activeMenu !== stateMenu) {
+      setActiveMenu(stateMenu);
+    }
+
+    const menuParam = searchParams.get("menu");
+    if (menuParam && activeMenu !== menuParam) {
+      setActiveMenu(menuParam);
+    }
+  }, [activeMenu, location.state?.activeMenu, searchParams, fetchWorkers, fetchActiveProjects, fetchAssignments, fetchApplications, fetchTasks]);
 
   async function handleHireWorker(e) {
     e.preventDefault();
@@ -184,14 +208,15 @@ export default function ContractorDashboard() {
     }
   }
 
-  async function fetchApplications() {
+  const fetchWorkerLogs = useCallback(async (workerId) => {
     try {
-      const res = await api.get("/api/sub-job-applications/");
-      setApplications(res.data);
+      const res = await api.get(`/api/work-logs/?worker=${workerId}`);
+      setSelectedWorkerLogs(res.data);
     } catch (err) {
-      console.error("Failed to fetch applications", err);
+      console.error(err);
+      setApiError("Failed to fetch worker logs.");
     }
-  }
+  }, []);
 
   async function handleAcceptApp(appId) {
     if (!window.confirm("Accept this worker and hire them for the project?")) return;
@@ -214,15 +239,6 @@ export default function ContractorDashboard() {
     } catch (err) {
       console.error(err);
       setApiError("Failed to reject application.");
-    }
-  }
-
-  async function fetchTasks() {
-    try {
-      const res = await api.get("/api/tasks/");
-      setTasks(res.data);
-    } catch (err) {
-      console.error("Failed to fetch tasks", err);
     }
   }
 
@@ -297,15 +313,6 @@ export default function ContractorDashboard() {
   }
 
   // fetch logs for a particular worker and show modal
-  async function fetchWorkerLogs(workerId) {
-    try {
-      const res = await api.get(`/api/work-logs/?worker=${workerId}`);
-      setSelectedWorkerLogs(res.data);
-    } catch (err) {
-      console.error(err);
-      setApiError("Failed to fetch worker logs.");
-    }
-  }
 
   function viewWorkerLogs(assign) {
     setSelectedWorkerName(assign.worker_username);
@@ -492,9 +499,7 @@ export default function ContractorDashboard() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button className="rounded-xl border px-4 py-2 text-sm hover:bg-slate-50">
-              Notifications
-            </button>
+            <NotificationBell />
             <button
               onClick={() => setActiveMenu("projects")}
               className="rounded-xl bg-emerald-900 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-950"
@@ -525,6 +530,8 @@ export default function ContractorDashboard() {
               navigate("/support/my-issues");
               return;
             }
+            // Update URL to match selected menu to prevent useEffect loops
+            navigate(`/contractor?menu=${key}`, { replace: true });
             setActiveMenu(key);
           }}
         />
@@ -758,7 +765,7 @@ export default function ContractorDashboard() {
 
               {activeMenu === "projects" && (
                 <div className="rounded-2xl border bg-white p-4 shadow-sm">
-                  <AvailableProjects />
+                  <AvailableProjects embedded={true} />
                 </div>
               )}
 
@@ -780,8 +787,8 @@ export default function ContractorDashboard() {
                   <p className="text-sm text-slate-600">Browse and hire workers for your projects.</p>
 
                   <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {workers.map(worker => (
-                      <div key={worker.id} className="rounded-2xl border bg-white p-6 shadow-sm hover:shadow-md transition">
+                    {workers.map((worker, idx) => (
+                      <div key={`worker-${worker.id}-${idx}`} className="rounded-2xl border bg-white p-6 shadow-sm hover:shadow-md transition">
                         <div className="flex items-center gap-4">
                           <div className="h-12 w-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-lg">
                             {worker.fullName[0]}
@@ -825,8 +832,8 @@ export default function ContractorDashboard() {
                               className="mt-1 w-full rounded-xl border p-3 text-sm"
                             >
                               <option value="">Select an active project</option>
-                              {activeProjects.map(p => (
-                                <option key={p.id} value={p.id}>{p.title}</option>
+                              {activeProjects.map((p, idx) => (
+                                <option key={`proj-opt-${p.id}-${idx}`} value={p.id}>{p.title}</option>
                               ))}
                             </select>
                           </div>
@@ -883,8 +890,8 @@ export default function ContractorDashboard() {
                   <p className="text-sm text-slate-600">Review workers who want to join your active projects.</p>
 
                   <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {applications.map(app => (
-                      <div key={app.id} className="rounded-2xl border bg-white p-6 shadow-sm hover:shadow-md transition">
+                    {applications.map((app, idx) => (
+                      <div key={`app-${app.id}-${idx}`} className="rounded-2xl border bg-white p-6 shadow-sm hover:shadow-md transition">
                         <div className="flex justify-between items-start">
                           <div>
                             <h3 className="font-bold text-slate-900">{app.worker_username}</h3>
@@ -946,8 +953,8 @@ export default function ContractorDashboard() {
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {assignments.map(a => (
-                          <tr key={a.id} className="bg-white">
+                        {assignments.map((a, idx) => (
+                          <tr key={`assign-${a.id}-${idx}`} className="bg-white">
                             <td className="px-6 py-4">{a.worker_username}</td>
                             <td className="px-6 py-4">{a.project_title}</td>
                             <td className="px-6 py-4">
@@ -1088,8 +1095,8 @@ export default function ContractorDashboard() {
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {tasks.map(t => (
-                          <React.Fragment key={t.id}>
+                        {tasks.map((t, idx) => (
+                          <React.Fragment key={`task-${t.id}-${idx}`}>
                             <tr className="bg-white">
                               <td className="px-6 py-4">
                                 <p className="font-bold text-slate-900">{t.task_name}</p>
@@ -1184,8 +1191,8 @@ export default function ContractorDashboard() {
                               <tr className="bg-slate-50/50">
                                 <td colSpan="4" className="px-6 py-4">
                                   <div className="flex gap-4 overflow-x-auto pb-2">
-                                    {t.updates.map(up => (
-                                      <div key={up.id} className="min-w-[200px] bg-white p-3 rounded-lg border shadow-sm">
+                                    {t.updates.map((up, uIdx) => (
+                                      <div key={`task-up-${up.id}-${uIdx}`} className="min-w-[200px] bg-white p-3 rounded-lg border shadow-sm">
                                         {up.photo && (
                                           <img
                                             src={up.photo}
@@ -1288,9 +1295,9 @@ export default function ContractorDashboard() {
               <div className="rounded-xl border p-4">
                 <p className="text-xs text-slate-500">Task Updates</p>
                 <div className="mt-3 space-y-3">
-                  {reviewTaskData.updates && reviewTaskData.updates.length > 0 ? (
-                    reviewTaskData.updates.map(update => (
-                      <div key={update.id} className="p-3 bg-slate-50 rounded-lg border">
+                    {reviewTaskData.updates && reviewTaskData.updates.length > 0 ? (
+                      reviewTaskData.updates.map((update, upIdx) => (
+                        <div key={`rev-up-${update.id}-${upIdx}`} className="p-3 bg-slate-50 rounded-lg border">
                         <p className="text-sm">{update.description}</p>
                         <div className="mt-2 text-xs text-slate-500">
                           By {update.worker_username} on {new Date(update.created_at).toLocaleDateString()}
@@ -1403,8 +1410,8 @@ export default function ContractorDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {selectedWorkerLogs.map(log => (
-                    <tr key={log.id}>
+                  {selectedWorkerLogs.map((log, lIdx) => (
+                    <tr key={`log-row-${log.id}-${lIdx}`}>
                       <td className="px-6 py-4">{log.date}</td>
                       <td className="px-6 py-4 font-medium text-slate-900">Project #{log.project}</td>
                       <td className="px-6 py-4">{log.hours_worked}</td>

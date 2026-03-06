@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import api from "../../API/axios";
 
 // utility to combine class names conditionally (mimics common classNames helper)
@@ -9,8 +9,10 @@ function classNames(...classes) {
 
 import PostProject from "../client/PostProject";
 import ProjectBids from "../client/ProjectBids";
+import MyProjects from "../client/MyProjects";
 import CostEstimator from "../client/CostEstimator";
 import Sidebar from "../../components/Sidebar";
+import NotificationBell from "../../components/NotificationBell";
 
 function normalizeProject(p) {
   return {
@@ -379,155 +381,11 @@ function MonitoringView({ projects }) {
     </div>
   );
 }
-
-function MyProjectsView({
-  projects,
-  loading,
-  error,
-  onRefresh,
-  onMarkCompleted,
-  actionLoadingId,
-  ratingProjectId,
-  setRatingProjectId,
-  onRated,
-  onPaymentStarted,
-  recommendedContractors = [],
-}) {
-  return (
-    <div className="max-w-5xl mx-auto">
-      {recommendedContractors.length > 0 && (
-        <div className="mb-6 rounded-2xl border bg-emerald-100/60 p-5">
-          <h2 className="text-lg font-bold text-emerald-900">Recommended Contractors</h2>
-          <p className="text-sm text-emerald-900/80 mb-4">Based on your newly posted project</p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {recommendedContractors.map((c) => (
-              <div key={c.id} className="rounded-xl bg-white p-4 shadow-sm border border-emerald-100">
-                <p className="font-semibold text-emerald-900">{c.fullName}</p>
-                <p className="text-sm text-slate-600">Experience: {c.experienceYears} years</p>
-                <p className="text-xs text-slate-500 mt-1">
-                  Types: {(c.projectTypes || []).join(", ")}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="flex items-center justify-between gap-3 mb-6">
-        <h1 className="text-2xl font-bold text-emerald-900">My Projects</h1>
-
-        <button
-          onClick={onRefresh}
-          className="rounded-xl border px-4 py-2 text-sm hover:bg-white"
-        >
-          Refresh
-        </button>
-      </div>
-
-      {loading && (
-        <div className="bg-white p-6 rounded-xl shadow text-sm text-emerald-900">
-          Loading projects...
-        </div>
-      )}
-
-      {error && !loading && (
-        <div className="bg-red-50 border border-red-200 p-4 rounded-xl text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      {!loading && !error && projects.length === 0 ? (
-        <div className="bg-white p-6 rounded-xl shadow">No projects posted yet.</div>
-      ) : (
-        !loading &&
-        !error && (
-          <div className="grid gap-4">
-            {projects.map((p) => (
-              <div key={p.id} className="bg-white rounded-xl shadow p-5 border">
-                <div className="flex justify-between items-center gap-4">
-                  <div>
-                    <h3 className="font-semibold text-emerald-900">{p.title}</h3>
-                    <p className="text-sm text-slate-500">
-                      {p.category} • {p.location}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 uppercase">
-                      {p.status}
-                    </span>
-
-                    {p.status === "ACTIVE" && (
-                      <button
-                        onClick={() => onMarkCompleted(p.id)}
-                        disabled={actionLoadingId === p.id}
-                        className="rounded-lg bg-slate-800 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-900 disabled:opacity-60"
-                      >
-                        {actionLoadingId === p.id ? "Completing..." : "Mark Completed"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <p className="mt-3 text-sm text-slate-700">{p.description}</p>
-                <div className="mt-2 flex gap-4 text-sm">
-                  <p>Budget: <b>NPR {p.budget}</b></p>
-                  <p>Model: <b className="uppercase">{p.hiring_model}</b></p>
-                </div>
-
-                {p.status === "COMPLETED" && p.payment_status !== "PAID" && (
-                  <div className="mt-3 rounded-xl border border-yellow-200 bg-yellow-50 p-3">
-                    <p className="text-sm text-yellow-900 font-semibold">
-                      Payment required (accepted bid amount)
-                    </p>
-                    <PayWithEsewaButton projectId={p.id} onStarted={onPaymentStarted} />
-                  </div>
-                )}
-
-                {p.status === "COMPLETED" && p.payment_status === "PAID" && (
-                  <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                    <p className="text-sm text-emerald-900 font-semibold">
-                      Paid ✅ {p.final_amount ? `NPR ${p.final_amount}` : ""}
-                    </p>
-                  </div>
-                )}
-
-                {p.status === "COMPLETED" && p.payment_status === "PAID" && !p.rated && (
-                  <div className="mt-3">
-                    <button
-                      onClick={() => setRatingProjectId(ratingProjectId === p.id ? null : p.id)}
-                      className="rounded-lg bg-emerald-700 px-3 py-1 text-xs text-white"
-                    >
-                      Rate Project
-                    </button>
-
-                    {ratingProjectId === p.id && (
-                      <RateProject
-                        projectId={p.id}
-                        onDone={() => {
-                          setRatingProjectId(null);
-                          onRated();
-                        }}
-                      />
-                    )}
-                  </div>
-                )}
-
-                {p.status === "COMPLETED" && p.payment_status === "PAID" && p.rated && (
-                  <p className="mt-3 text-xs text-emerald-700 font-semibold">Already Rated</p>
-                )}
-              </div>
-            ))}
-          </div>
-        )
-      )}
-    </div>
-  );
-}
-
 export default function ClientDashboard() {
+
   const navigate = useNavigate();
   const [activeMenu, setActiveMenu] = useState("dashboard");
+  const [searchParams] = useSearchParams();
 
   const [search, setSearch] = useState("");
   const [projects, setProjects] = useState([]);
@@ -576,15 +434,16 @@ export default function ClientDashboard() {
       setActiveMenu(location.state.activeMenu);
     }
 
-    const url = new URL(window.location.href);
-
-    if (url.searchParams.get("paid") === "1") {
+    if (searchParams.get("paid") === "1") {
       loadProjects();
-      url.searchParams.delete("paid");
-      window.history.replaceState({}, "", url.pathname);
       setActiveMenu("my-projects");
     }
-  }, []);
+
+    const menuParam = searchParams.get("menu");
+    if (menuParam) {
+      setActiveMenu(menuParam);
+    }
+  }, [location.state?.activeMenu, searchParams]);
 
   const filteredProjects = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -629,12 +488,15 @@ export default function ClientDashboard() {
             </div>
           </div>
 
-          <button
-            onClick={() => setActiveMenu("postproject")}
-            className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white"
-          >
-            Post Project
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setActiveMenu("postproject")}
+              className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white"
+            >
+              Post Project
+            </button>
+            <NotificationBell />
+          </div>
         </div>
       </header>
 
@@ -658,6 +520,8 @@ export default function ClientDashboard() {
               navigate("/support/my-issues");
               return;
             }
+            // Update URL to match selected menu to prevent useEffect loops
+            navigate(`/clientdashboard?menu=${key}`, { replace: true });
             setActiveMenu(key);
             if (key !== "my-projects") setRecommendedContractors([]);
           }}
@@ -765,7 +629,8 @@ export default function ClientDashboard() {
           )}
 
           {activeMenu === "my-projects" && (
-            <MyProjectsView
+            <MyProjects
+              embedded={true}
               projects={projects}
               loading={loadingProjects}
               error={projectsError}
@@ -782,6 +647,7 @@ export default function ClientDashboard() {
 
           {activeMenu === "postproject" && (
             <PostProject
+              embedded={true}
               prefillEstimate={prefillEstimate}
               onCreated={(data) => {
                 loadProjects();
@@ -791,7 +657,7 @@ export default function ClientDashboard() {
             />
           )}
 
-          {activeMenu === "project-bids" && <ProjectBids onDone={() => setActiveMenu("dashboard")} />}
+          {activeMenu === "project-bids" && <ProjectBids embedded={true} onDone={() => setActiveMenu("dashboard")} />}
 
           {activeMenu === "monitoring" && <MonitoringView projects={projects} />}
 

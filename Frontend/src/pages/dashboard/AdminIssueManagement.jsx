@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import api from "../../API/axios";
+import { useSearchParams } from "react-router-dom";
 
 export default function AdminIssueManagement() {
     const [issues, setIssues] = useState([]);
@@ -16,6 +17,9 @@ export default function AdminIssueManagement() {
         admin_note: ""
     });
     const [updating, setUpdating] = useState(false);
+    
+    const [searchParams] = useSearchParams();
+    const highlightIssueId = searchParams.get("issue");
 
     const fetchIssues = async () => {
         setLoading(true);
@@ -36,7 +40,19 @@ export default function AdminIssueManagement() {
 
     useEffect(() => {
         fetchIssues();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filters.status, filters.priority, filters.type]);
+
+    useEffect(() => {
+        // Auto-select issue if provided via URL and present in list
+        if (highlightIssueId && issues.length > 0 && !selectedIssue) {
+            const targetIssue = issues.find(i => i.id.toString() === highlightIssueId);
+            if (targetIssue) {
+                handleSelectIssue(targetIssue);
+            }
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [issues, highlightIssueId]);
 
     const handleSearch = (e) => {
         e.preventDefault();

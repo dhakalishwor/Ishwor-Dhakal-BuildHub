@@ -14,6 +14,7 @@ from ContractorManagement.models import Contractor
 from ContractorManagement.serializers import ContractorSerializer
 from ProgressTracking.models import ProjectAssignment, WorkLog
 from BiddingSystem.models import Bid
+from NotificationSystem.utils import notify
 
 
 User = get_user_model()
@@ -57,8 +58,21 @@ class ProjectViewSet(ModelViewSet):
 
         from .services import recommend_contractors_for_project
         project = serializer.save(client=user)
-        self._recommended_contractors = recommend_contractors_for_project(project)
+        recommended = recommend_contractors_for_project(project)
+        self._recommended_contractors = recommended
         self._category_label = dict(Project.CATEGORY_CHOICES).get(project.category, "")
+
+        # Notify each recommended contractor about the new project
+        for contractor_profile in recommended:
+            contractor_user = getattr(contractor_profile, "user", None)
+            if contractor_user:
+                notify(
+                    user=contractor_user,
+                    title="New Project Available",
+                    message=f"A new {project.category} project \"{project.title}\" in {project.location} matches your profile.",
+                    type="SYSTEM",
+                    link=f"/contractor?menu=projects&project={project.id}",
+                )
 
     def create(self, request, *args, **kwargs):
         response = super().create(request, *args, **kwargs)
@@ -110,5 +124,15 @@ class ProjectViewSet(ModelViewSet):
 
         project.status = "COMPLETED"
         project.save(update_fields=["status"])
+
+        # Notify the assigned contractor that the project has been marked completed
+        if project.assigned_contractor:
+            notify(
+                user=project.assigned_contractor,
+                title="Project Completed",
+                message=f"The client has marked project \"{project.title}\" as completed. Payment may follow shortly.",
+                type="SYSTEM",
+                link=f"/contractor?menu=bids&project={project.id}",
+            )
 
         return Response({"detail": "Project marked as completed."}, status=status.HTTP_200_OK)

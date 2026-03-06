@@ -1,6 +1,7 @@
 import React from "react";
 import Sidebar from "./Sidebar";
 import { useNavigate } from "react-router-dom";
+import NotificationBell from "./NotificationBell";
 
 export default function DashboardLayout({ children, role, activeMenu }) {
     const navigate = useNavigate();
@@ -24,6 +25,7 @@ export default function DashboardLayout({ children, role, activeMenu }) {
                     </div>
 
                     <div className="flex items-center gap-4">
+                        <NotificationBell />
                         <button
                             onClick={() => navigate(-1)}
                             className="text-sm font-medium text-slate-600 hover:text-emerald-700 transition"

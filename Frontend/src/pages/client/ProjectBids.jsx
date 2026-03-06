@@ -1,14 +1,17 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../API/axios";
+import DashboardLayout from "../../components/DashboardLayout";
 
-export default function ProjectBids({ onDone, onChatStarted }) {
+export default function ProjectBids({ onChatStarted, embedded = false }) {
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
   const [bids, setBids] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errMsg, setErrMsg] = useState("");
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
 
   const startConversation = async (projectId, contractorId) => {
     try {
@@ -33,9 +36,12 @@ export default function ProjectBids({ onDone, onChatStarted }) {
     setErrMsg("");
     try {
       const res = await api.get("/api/projects/");
-      setProjects(res.data || []);
+      const data = res.data || [];
+      setProjects(data);
+      return data;
     } catch (err) {
       setErrMsg(err?.response?.data?.detail || "Failed to load projects");
+      return [];
     } finally {
       setLoading(false);
     }
@@ -70,34 +76,24 @@ export default function ProjectBids({ onDone, onChatStarted }) {
   };
 
   useEffect(() => {
-    fetchProjects();
+    fetchProjects().then((data) => {
+      const qProject = searchParams.get("project");
+      if (qProject && data.find(p => p.id == qProject)) {
+        fetchBids(qProject);
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return (
+  const HEADER_H = 64;
+
+  const content = (
     <div className="max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-6 gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-emerald-900">Project Bids</h1>
-          <p className="text-sm text-slate-600">
-            Select a project and review bids. Accept one bid to assign a contractor.
-          </p>
-        </div>
-
-        <div className="flex gap-2">
-          <button
-            onClick={fetchProjects}
-            className="px-4 py-2 rounded-xl border text-sm hover:bg-white"
-          >
-            Refresh
-          </button>
-
-          <button
-            onClick={() => onDone?.()}
-            className="px-4 py-2 rounded-xl bg-emerald-700 text-white text-sm font-semibold hover:bg-emerald-800"
-          >
-            Back
-          </button>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-emerald-900">Project Bids</h1>
+        <p className="text-sm text-slate-600">
+          Select a project and review bids. Accept one bid to assign a contractor.
+        </p>
       </div>
 
       {errMsg && (
@@ -234,5 +230,13 @@ export default function ProjectBids({ onDone, onChatStarted }) {
         </div>
       </div>
     </div>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <DashboardLayout role="client" activeMenu="project-bids">
+      {content}
+    </DashboardLayout>
   );
 }

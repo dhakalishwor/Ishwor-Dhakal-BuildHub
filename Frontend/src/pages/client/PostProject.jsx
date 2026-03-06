@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import api from "../../API/axios";
-
-// Fix for Leaflet default icon issue with Webpack/Vite
+import { useNavigate } from "react-router-dom";
+import DashboardLayout from "../../components/DashboardLayout";
 import icon from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
 
@@ -42,13 +42,14 @@ function LocationMarker({ position, setPosition }) {
   );
 }
 
-export default function PostProject({ onCreated, onDone }) {
+export default function PostProject({ onCreated, onDone, embedded = false }) {
   const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [mapPosition, setMapPosition] = useState(null);
+  const navigate = useNavigate();
 
-  // Default center for Nepal (approximate)
+  // Default center for Nepal 
   const defaultCenter = [27.7172, 85.3240];
 
   function onChange(e) {
@@ -104,7 +105,8 @@ export default function PostProject({ onCreated, onDone }) {
       const res = await api.post("/api/projects/", payload);
 
       onCreated?.(res.data);
-      onDone?.();
+      if (onDone) onDone();
+      else navigate("/clientdashboard");
       setForm(initialForm);
       setMapPosition(null);
     } catch (err) {
@@ -135,23 +137,13 @@ export default function PostProject({ onCreated, onDone }) {
     }
   }
 
-  return (
-    <div className="max-w-3xl mx-auto">
-      <div className="flex items-center justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-emerald-900">Post New Project</h1>
-          <p className="text-sm text-slate-600">
-            Create a project so contractors can bid and you can choose the best one.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => onDone?.()}
-          className="text-sm rounded-lg border px-3 py-2 hover:bg-slate-50"
-        >
-          ← Back
-        </button>
+  const content = (
+    <div className="max-w-3xl mx-auto p-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-emerald-900">Post New Project</h1>
+        <p className="text-sm text-slate-600">
+          Create a project so contractors can bid and you can choose the best one.
+        </p>
       </div>
 
       {error && (
@@ -305,5 +297,13 @@ export default function PostProject({ onCreated, onDone }) {
         </form>
       </div>
     </div>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <DashboardLayout role="client" activeMenu="postproject">
+      {content}
+    </DashboardLayout>
   );
 }

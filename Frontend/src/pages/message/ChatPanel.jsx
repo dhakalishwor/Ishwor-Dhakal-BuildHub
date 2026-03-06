@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../API/axios";
 
@@ -22,7 +22,7 @@ export default function ChatPanel({ initialConversation = null }) {
     const accessToken = localStorage.getItem("accessToken") || "";
     const myUsername = localStorage.getItem("username") || "";
 
-    const fetchConversations = async () => {
+    const fetchConversations = useCallback(async () => {
         try {
             const res = await api.get("/api/chat/");
             const convs = res.data || [];
@@ -35,9 +35,9 @@ export default function ChatPanel({ initialConversation = null }) {
         } catch (err) {
             console.error("Failed to fetch conversations", err);
         }
-    };
+    }, [initialConversation]);
 
-    const fetchMessages = async (convId) => {
+    const fetchMessages = useCallback(async (convId) => {
         setLoading(true);
         try {
             const res = await api.get(`/api/chat/${convId}/messages/`);
@@ -53,16 +53,16 @@ export default function ChatPanel({ initialConversation = null }) {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
-    function buildWsUrl(convId) {
+    const buildWsUrl = useCallback((convId) => {
         const isHttps = window.location.protocol === "https:";
         const wsScheme = isHttps ? "wss" : "ws";
         const host = window.location.hostname + ":8000";
         return `${wsScheme}://${host}/ws/chat/${convId}/?token=${accessToken}`;
-    }
+    }, [accessToken]);
 
-    function connect(convId) {
+    const connect = useCallback((convId) => {
         if (!convId || !accessToken) return;
         setWsError("");
         if (wsRef.current) wsRef.current.close();
@@ -88,7 +88,7 @@ export default function ChatPanel({ initialConversation = null }) {
         };
         ws.onerror = () => setWsError("WebSocket connection failed.");
         ws.onclose = () => setConnected(false);
-    }
+    }, [accessToken, buildWsUrl]);
 
     function sendMessage() {
         const text = input.trim();
@@ -99,7 +99,7 @@ export default function ChatPanel({ initialConversation = null }) {
 
     useEffect(() => {
         fetchConversations();
-    }, []);
+    }, [fetchConversations]);
 
     useEffect(() => {
         if (activeConv) {
@@ -107,7 +107,7 @@ export default function ChatPanel({ initialConversation = null }) {
             connect(activeConv.id);
         }
         return () => wsRef.current?.close();
-    }, [activeConv]);
+    }, [activeConv, fetchMessages, connect]);
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });

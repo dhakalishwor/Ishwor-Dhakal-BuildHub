@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import Landing from "./assets/landing";
@@ -39,6 +39,8 @@ function App() {
       <Route path="/messages" element={<MessagesPage />} />
       <Route path="/support/report" element={<ReportIssue />} />
       <Route path="/support/my-issues" element={<MyIssues />} />
+      <Route path="/projects/:id" element={<Navigate to="/" replace />} />
+      <Route path="/projects/:id/progress" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

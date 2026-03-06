@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth import get_user_model
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 
@@ -9,11 +10,28 @@ from .serializers import (
     AdminReportUpdateSerializer,
 )
 from .permissions import IsAdmin
+from NotificationSystem.utils import notify
+
+User = get_user_model()
 
 
 class CreateReportView(generics.CreateAPIView):
     serializer_class = ReportCreateSerializer
     permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        report = serializer.save(reporter=self.request.user)
+
+        # Notify all admin/staff users about the new report
+        admins = User.objects.filter(is_staff=True)
+        for admin in admins:
+            notify(
+                user=admin,
+                title="New Issue Report Submitted",
+                message=f"Report #{report.id} '{report.title}' submitted by {self.request.user.username} [{report.report_type}].",
+                type="ISSUE",
+                link=f"/admin/dashboard?issue={report.id}",
+            )
 
 
 class MyReportsView(generics.ListAPIView):
@@ -59,6 +77,18 @@ class AdminReportUpdateView(generics.RetrieveUpdateAPIView):
     serializer_class = AdminReportUpdateSerializer
     permission_classes = [IsAuthenticated, IsAdmin]
     http_method_names = ["get", "patch"]
+
+    def perform_update(self, serializer):
+        report = serializer.save()
+
+        # Notify the original reporter about the status change
+        notify(
+            user=report.reporter,
+            title="Your Report Status Updated",
+            message=f"Report #{report.id} '{report.title}' is now {report.get_status_display()}.",
+            type="ISSUE",
+            link=f"/support/my-issues?issue={report.id}",
+        )
 
 
 class ReportDetailView(generics.RetrieveAPIView):

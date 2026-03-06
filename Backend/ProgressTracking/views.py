@@ -9,6 +9,7 @@ from .serializers import (
     TaskSerializer, TaskUpdateSerializer, ProjectProgressUpdateSerializer
 )
 from django.utils import timezone
+from NotificationSystem.utils import notify
 
 class WorkLogViewSet(viewsets.ModelViewSet):
     queryset = WorkLog.objects.all()
@@ -238,7 +239,17 @@ class TaskViewSet(viewsets.ModelViewSet):
                 from rest_framework.exceptions import ValidationError
                 raise ValidationError("Worker must be actively assigned to the project.")
         
-        serializer.save(contractor=self.request.user)
+        task = serializer.save(contractor=self.request.user)
+
+        # Notify the assigned worker
+        if task.assigned_to:
+            notify(
+                user=task.assigned_to,
+                title="Task Assigned",
+                message=f"You have been assigned a new task: {task.task_name}",
+                type="SYSTEM",
+                link="/worker/dashboard?menu=mytasks"
+            )
 
     @action(detail=True, methods=['post'], url_path='submit-update')
     def submit_update(self, request, pk=None):
@@ -494,15 +505,33 @@ class ProjectProgressUpdateViewSet(viewsets.ModelViewSet):
         is_assigned_worker = ProjectAssignment.objects.filter(project=project, worker=user, status='ACTIVE').exists()
         
         if not (is_contractor or is_assigned_worker or user.role == 'admin'):
-            # This check might be better in a permission class but here for simplicity
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("You must have an active assignment to post progress updates.")
-        # If milestone provided, ensure it belongs to the same project
         if milestone and milestone.project_id != project.id:
             from rest_framework.exceptions import ValidationError
             raise ValidationError("Provided milestone does not belong to the project.")
 
-        serializer.save(posted_by=user)
+        update = serializer.save(posted_by=user)
+
+        # Notify the project client about the new progress update
+        if project.client and project.client != user:
+            notify(
+                user=project.client,
+                title="Progress Update Submitted",
+                message=f"{user.username} submitted a progress update on \"{project.title}\".",
+                type="PROGRESS",
+                link=f"/clientdashboard?menu=monitoring&project={project.id}",
+            )
+
+        # If posted by a worker, also notify the assigned contractor
+        if user.role == 'worker' and project.assigned_contractor and project.assigned_contractor != user:
+            notify(
+                user=project.assigned_contractor,
+                title="Worker Progress Update",
+                message=f"{user.username} submitted a progress update on \"{project.title}\".",
+                type="PROGRESS",
+                link=f"/contractor?menu=manage-team&project={project.id}",
+            )
 
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
@@ -520,8 +549,16 @@ class ProjectProgressUpdateViewSet(viewsets.ModelViewSet):
                 m.completed_at = timezone.now()
                 m.save()
         except Exception:
-            # Don't block approval if milestone update fails; log if needed
             pass
+
+        # Notify the worker/contractor who posted the update
+        notify(
+            user=update.posted_by,
+            title="Progress Update Approved ✅",
+            message=f"Your progress update on \"{update.project.title}\" has been approved by the client.",
+            type="PROGRESS",
+            link="",
+        )
         return Response(ProjectProgressUpdateSerializer(update).data)
 
     @action(detail=True, methods=['post'])
@@ -534,4 +571,13 @@ class ProjectProgressUpdateViewSet(viewsets.ModelViewSet):
         update.status = 'REJECTED'
         update.rejection_reason = reason
         update.save()
+
+        # Notify the worker/contractor who posted the update
+        notify(
+            user=update.posted_by,
+            title="Progress Update Rejected",
+            message=f"Your progress update on \"{update.project.title}\" was rejected. Reason: {reason or 'No reason provided'}.",
+            type="PROGRESS",
+            link="",
+        )
         return Response(ProjectProgressUpdateSerializer(update).data)

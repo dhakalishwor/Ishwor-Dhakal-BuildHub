@@ -1,5 +1,7 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import api from "../../API/axios";
+import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
+import NotificationBell from "../../components/NotificationBell";
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(" ");
@@ -15,6 +17,7 @@ function StatCard({ title, value }) {
 }
 
 export default function WorkerDashboard() {
+  const navigate = useNavigate();
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const [loading, setLoading] = useState(false);
 
@@ -45,79 +48,143 @@ export default function WorkerDashboard() {
   const [projectProgressLoading, setProjectProgressLoading] = useState(false);
   const [projectUpdates, setProjectUpdates] = useState([]);
 
-  useEffect(() => {
-    fetchData();
-    // note: fetchData is intentionally omitted from deps to avoid re-creation loops
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeMenu]);
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
 
-  async function fetchData() {
-    setLoading(true);
+
+  const fetchJobs = useCallback(async (discovery = false) => {
     try {
-      if (activeMenu === "dashboard" || activeMenu === "myjobs") {
-        const jobsRes = await api.get("/api/projects/");
-        // Filter jobs where I am the assigned contractor (as a worker)
-        // Note: In this system, 'assigned_contractor' can be a worker too.
-        setMyJobs(jobsRes.data.filter(j => j.status === "ACTIVE" || j.status === "COMPLETED"));
+      const res = await api.get(discovery ? "/api/projects/?discovery=true" : "/api/projects/");
+      const data = res.data || [];
+      if (discovery) {
+        setAvailableJobs(data.filter(j => j.status === "BIDDING"));
+        setSubJobs(data.filter(j => j.status === "ACTIVE"));
+      } else {
+        setMyJobs(data.filter(j => j.status === "ACTIVE" || j.status === "COMPLETED"));
       }
-      if (activeMenu === "available") {
-        // use discovery endpoint to avoid projects we've already bid on or logged work for
-        const jobsRes = await api.get("/api/projects/?discovery=true");
-        setAvailableJobs(jobsRes.data.filter(j => j.status === "BIDDING"));
-      }
-      if (activeMenu === "payments") {
-        const payRes = await api.get("/api/payments/worker/");
-        setPayments(payRes.data);
-      }
-      if (activeMenu === "dashboard") {
-        const logsRes = await api.get("/api/work-logs/");
-        setWorkLogs(logsRes.data);
-      }
-      if (activeMenu === "myjobs" || activeMenu === "dashboard") {
-        const milestoneRes = await api.get("/api/milestones/");
-        setMilestones(milestoneRes.data);
-      }
-      if (activeMenu === "available" || activeMenu === "dashboard") {
-        const bidsRes = await api.get("/api/my-bids/");
-        setMyBids(bidsRes.data);
-      }
-      if (activeMenu === "subjobs" || activeMenu === "dashboard") {
-        const subJobsRes = await api.get("/api/projects/?discovery=true");
-        setSubJobs(subJobsRes.data.filter(j => j.status === "ACTIVE"));
+    } catch (err) { console.error("fetchJobs failed", err); }
+  }, []);
 
-        const myAppsRes = await api.get("/api/sub-job-applications/");
-        setSubJobApplications(myAppsRes.data);
-      }
-      if (activeMenu === "myjobs" || activeMenu === "dashboard") {
-        const assignmentsRes = await api.get("/api/assignments/");
-        setMyAssignments(assignmentsRes.data.filter(a => a.status === 'ACTIVE'));
-      }
-      if (activeMenu === "mytasks") {
-        const tasksRes = await api.get("/api/tasks/");
-        setTasks(tasksRes.data);
-      }
-      if (activeMenu === "project-progress" || activeMenu === "dashboard") {
-        const progRes = await api.get("/api/progress-updates/");
-        setProjectUpdates(progRes.data);
-        const myJobsRes = await api.get("/api/projects/"); // To populate project select
-        setMyJobs(myJobsRes.data.filter(j => j.status === "ACTIVE"));
-      }
-      if (activeMenu === "profile") {
-        const profileRes = await api.get("/api/workers/me/");
+  const fetchPayments = useCallback(async () => {
+    try {
+      const res = await api.get("/api/payments/worker/");
+      setPayments(res.data || []);
+    } catch (err) { console.error("fetchPayments failed", err); }
+  }, []);
+
+  const fetchWorkLogs = useCallback(async () => {
+    try {
+      const res = await api.get("/api/work-logs/");
+      setWorkLogs(res.data || []);
+    } catch (err) { console.error("fetchWorkLogs failed", err); }
+  }, []);
+
+  const fetchMilestones = useCallback(async () => {
+    try {
+      const res = await api.get("/api/milestones/");
+      setMilestones(res.data || []);
+    } catch (err) { console.error("fetchMilestones failed", err); }
+  }, []);
+
+  const fetchMyBids = useCallback(async () => {
+    try {
+      const res = await api.get("/api/my-bids/");
+      setMyBids(res.data || []);
+    } catch (err) { console.error("fetchMyBids failed", err); }
+  }, []);
+
+  const fetchSubJobApps = useCallback(async () => {
+    try {
+      const res = await api.get("/api/sub-job-applications/");
+      setSubJobApplications(res.data || []);
+    } catch (err) { console.error("fetchSubJobApps failed", err); }
+  }, []);
+
+  const fetchAssignments = useCallback(async () => {
+    try {
+      const res = await api.get("/api/assignments/");
+      setMyAssignments((res.data || []).filter(a => a.status === 'ACTIVE'));
+    } catch (err) { console.error("fetchAssignments failed", err); }
+  }, []);
+
+  const fetchTasks = useCallback(async () => {
+    try {
+      const res = await api.get("/api/tasks/");
+      setTasks(res.data || []);
+    } catch (err) { console.error("fetchTasks failed", err); }
+  }, []);
+
+  const fetchProgressUpdates = useCallback(async () => {
+    try {
+      const res = await api.get("/api/progress-updates/");
+      setProjectUpdates(res.data || []);
+    } catch (err) { console.error("fetchProgressUpdates failed", err); }
+  }, []);
+
+  const fetchProfile = useCallback(async () => {
+    try {
+      const res = await api.get("/api/workers/me/");
+      if (res.data) {
         setProfile({
-          fullName: profileRes.data.full_name || "",
-          skills: profileRes.data.skills || "",
-          dailyRate: profileRes.data.daily_rate || "",
-          availability: profileRes.data.availability_status === "AVAILABLE"
+          fullName: res.data.full_name || "",
+          skills: res.data.skills || "",
+          dailyRate: res.data.daily_rate || "",
+          availability: res.data.availability_status === "AVAILABLE"
         });
       }
-    } catch (err) {
-      console.error(err);
-      alert("Failed to fetch data.");
-    } finally {
+    } catch (err) { console.error("fetchProfile failed", err); }
+  }, []);
+
+  // Main data trigger based on activeMenu
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      if (activeMenu === "dashboard") {
+        await Promise.all([
+          fetchJobs(),
+          fetchWorkLogs(),
+          fetchMilestones(),
+          fetchMyBids(),
+          fetchJobs(true), // for sub-jobs/available
+          fetchSubJobApps(),
+          fetchAssignments(),
+          fetchProgressUpdates()
+        ]);
+      } else if (activeMenu === "available") {
+        await Promise.all([fetchJobs(true), fetchMyBids()]);
+      } else if (activeMenu === "myjobs") {
+        await Promise.all([fetchJobs(), fetchMilestones(), fetchAssignments()]);
+      } else if (activeMenu === "mytasks") {
+        await fetchTasks();
+      } else if (activeMenu === "payments") {
+        await fetchPayments();
+      } else if (activeMenu === "subjobs") {
+        await Promise.all([fetchJobs(true), fetchSubJobApps()]);
+      } else if (activeMenu === "project-progress") {
+        await Promise.all([fetchProgressUpdates(), fetchJobs()]);
+      } else if (activeMenu === "profile") {
+        await fetchProfile();
+      }
       setLoading(false);
+    };
+    load();
+  }, [
+    activeMenu, fetchJobs, fetchPayments, fetchWorkLogs, fetchMilestones,
+    fetchMyBids, fetchSubJobApps, fetchAssignments, fetchTasks,
+    fetchProgressUpdates, fetchProfile
+  ]);
+
+  // Sync activeMenu with URL
+  useEffect(() => {
+    const menuParam = searchParams.get("menu");
+    if (menuParam && activeMenu !== menuParam) {
+      setActiveMenu(menuParam);
     }
-  }
+    const stateMenu = location.state?.activeMenu;
+    if (stateMenu && activeMenu !== stateMenu) {
+      setActiveMenu(stateMenu);
+    }
+  }, [searchParams, location.state, activeMenu]);
 
   const [logForm, setLogForm] = useState({ project: "", hours: "", date: new Date().toISOString().split('T')[0], description: "" });
   const [logLoading, setLogLoading] = useState(false);
@@ -154,7 +221,7 @@ export default function WorkerDashboard() {
         description: logForm.description
       });
       setLogForm({ project: "", hours: "", date: new Date().toISOString().split('T')[0], description: "" });
-      fetchData();
+      fetchWorkLogs();
       alert("Work log submitted!");
     } catch (err) {
       console.error(err);
@@ -185,7 +252,7 @@ export default function WorkerDashboard() {
         hours_worked: editLogForm.hours,
         description: editLogForm.description
       });
-      fetchData();
+      fetchWorkLogs();
       alert("Work log updated!");
       setEditLogModalOpen(false);
     } catch (err) {
@@ -199,7 +266,7 @@ export default function WorkerDashboard() {
   async function handleCompleteMilestone(milestoneId) {
     try {
       await api.post(`/api/milestones/${milestoneId}/complete/`);
-      fetchData();
+      fetchMilestones();
       alert("Milestone marked as completed!");
     } catch (err) {
       console.error(err);
@@ -222,7 +289,8 @@ export default function WorkerDashboard() {
       alert("Bid submitted successfully!");
       setBiddingJob(null);
       setBidForm({ price: "", days: "", dailyRate: "", message: "" });
-      fetchData();
+      fetchMyBids();
+      fetchJobs(true);
     } catch (err) {
       alert(err?.response?.data?.detail || "Failed to submit bid.");
     } finally {
@@ -242,7 +310,7 @@ export default function WorkerDashboard() {
       alert("Application sent successfully!");
       setApplyingJob(null);
       setApplyForm({ message: "" });
-      fetchData();
+      fetchSubJobApps();
     } catch (err) {
       console.error(err);
       alert("Failed to send application.");
@@ -262,7 +330,7 @@ export default function WorkerDashboard() {
         availability_status: profile.availability ? "AVAILABLE" : "BUSY"
       });
       alert("Profile updated successfully!");
-      fetchData();
+      fetchProfile();
     } catch (err) {
       console.error(err);
       alert("Failed to update profile.");
@@ -285,7 +353,7 @@ export default function WorkerDashboard() {
       });
       alert("Task update submitted!");
       setTaskUpdateForm({ taskId: null, description: "", photo: null });
-      fetchData();
+      fetchTasks();
     } catch (err) {
       console.error(err);
       alert("Failed to submit task update.");
@@ -309,7 +377,10 @@ export default function WorkerDashboard() {
       });
       alert("Project progress update submitted!");
       setProjectProgressForm({ projectId: "", description: "", photo: null });
-      fetchData();
+      if (activeMenu === "dashboard" || activeMenu === "project-progress") {
+        fetchProgressUpdates();
+        fetchJobs();
+      }
     } catch (err) {
       console.error(err);
       alert("Failed to submit progress update.");
@@ -345,12 +416,18 @@ export default function WorkerDashboard() {
             </div>
           </div>
 
-          <button
-            onClick={() => setActiveMenu("available")}
-            className="rounded-xl bg-emerald-900 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-950"
-          >
-            Available Jobs
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => {
+                setActiveMenu("available");
+                navigate("/worker/dashboard?menu=available", { replace: true });
+              }}
+              className="rounded-xl bg-emerald-900 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-950"
+            >
+              Available Jobs
+            </button>
+            <NotificationBell />
+          </div>
         </div>
       </header>
 
@@ -370,7 +447,10 @@ export default function WorkerDashboard() {
             ].map((item) => (
               <button
                 key={item.key}
-                onClick={() => setActiveMenu(item.key)}
+                onClick={() => {
+                  setActiveMenu(item.key);
+                  navigate(`/worker/dashboard?menu=${item.key}`, { replace: true });
+                }}
                 className={classNames(
                   "mt-3 w-full rounded-xl px-4 py-3 text-left transition",
                   activeMenu === item.key ? "bg-emerald-700 text-white shadow" : "bg-emerald-900 hover:bg-emerald-800",
@@ -933,7 +1013,8 @@ export default function WorkerDashboard() {
                                 onClick={() => {
                                   setLogForm({ ...logForm, project: a.project });
                                   setActiveMenu("dashboard");
-                                  window.scrollTo({ top: 400, behavior: 'smooth' });
+                                  navigate("/worker/dashboard?menu=dashboard", { replace: true });
+                                  window.scrollTo({ top: 400, behavior: "smooth" });
                                 }}
                                 className="text-xs font-bold text-emerald-700 hover:underline"
                               >
@@ -974,7 +1055,8 @@ export default function WorkerDashboard() {
                                     onClick={() => {
                                       setLogForm({ ...logForm, project: job.id });
                                       setActiveMenu("dashboard");
-                                      window.scrollTo({ top: 400, behavior: 'smooth' });
+                                      navigate("/worker/dashboard?menu=dashboard", { replace: true });
+                                      window.scrollTo({ top: 400, behavior: "smooth" });
                                     }}
                                     className="text-xs font-bold text-emerald-700 hover:underline"
                                   >
@@ -1065,7 +1147,7 @@ export default function WorkerDashboard() {
                                 onClick={async () => {
                                   try {
                                     await api.post(`/api/tasks/${t.id}/worker-accept/`);
-                                    fetchData();
+                                    fetchTasks();
                                     alert("Task accepted!");
                                   } catch (e) {
                                     console.error(e);
@@ -1080,7 +1162,7 @@ export default function WorkerDashboard() {
                                 onClick={async () => {
                                   try {
                                     await api.post(`/api/tasks/${t.id}/worker-reject/`);
-                                    fetchData();
+                                    fetchTasks();
                                     alert("Task rejected.");
                                   } catch (e) {
                                     console.error(e);
