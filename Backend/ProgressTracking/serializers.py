@@ -8,9 +8,9 @@ class WorkLogSerializer(serializers.ModelSerializer):
         model = WorkLog
         fields = [
             'id', 'project', 'worker', 'worker_username', 'date', 
-            'hours_worked', 'description', 'status', 'created_at', 'updated_at'
+            'hours_worked', 'description', 'status', 'payment_status', 'transaction_uuid', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['worker', 'status', 'created_at', 'updated_at']
+        read_only_fields = ['worker', 'status', 'payment_status', 'transaction_uuid', 'created_at', 'updated_at']
 
     def validate(self, attrs):
         user = self.context['request'].user
@@ -85,11 +85,12 @@ class TaskSerializer(serializers.ModelSerializer):
     updates = TaskUpdateSerializer(many=True, read_only=True)
     assigned_to_username = serializers.ReadOnlyField(source='assigned_to.username')
     project_title = serializers.ReadOnlyField(source='project.title')
+    project_status = serializers.ReadOnlyField(source='project.status')
 
     class Meta:
         model = Task
         fields = [
-            'id', 'project', 'project_title', 'contractor', 'task_name', 
+            'id', 'project', 'project_title', 'project_status', 'contractor', 'task_name', 
             'description', 'assigned_to', 'assigned_to_username', 'status', 
             'progress_percentage', 'comments', 'due_date', 'date_updated', 'updates'
         ]

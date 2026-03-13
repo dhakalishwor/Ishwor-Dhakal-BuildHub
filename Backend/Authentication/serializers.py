@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import ContractorLicense
+from .models import ContractorLicense, ClientProfile
 
 User = get_user_model()
 
@@ -90,3 +90,11 @@ class RoleBasedTokenObtainPairSerializer(TokenObtainPairSerializer):
             "is_admin": bool(user.is_staff or user.is_superuser),
         }
         return data
+
+
+class ClientProfileSerializer(serializers.ModelSerializer):
+    fullName = serializers.CharField(source="full_name")
+
+    class Meta:
+        model = ClientProfile
+        fields = ["id", "fullName", "phone", "address", "bio"]

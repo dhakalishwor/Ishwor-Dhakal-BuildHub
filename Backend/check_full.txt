@@ -1,0 +1,37 @@
+﻿python : 
+SystemCheckError: 
+System check 
+identified some 
+issues:
+At line:1 char:1
++ python manage.py 
+check 2>&1 | Out-File 
+-FilePath 
+check_full.txt -Enco 
+...
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: (SystemChec   
+ kErro...ed some i    
+ssues::String) []    
+, RemoteException
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+
+ERRORS:
+RecommendationSystem.P
+roject.payment_status:
+ (fields.E009) 
+'max_length' is too 
+small to fit the 
+longest value in 
+'choices' (14 
+characters).
+
+System check 
+identified 1 issue (0 
+silenced).

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import api from "../../API/axios";
 import { useSearchParams } from "react-router-dom";
+import { toast } from "react-hot-toast";
 
 export default function AdminIssueManagement() {
     const [issues, setIssues] = useState([]);
@@ -72,12 +73,12 @@ export default function AdminIssueManagement() {
         setUpdating(true);
         try {
             await api.patch(`/api/admin/reports/${selectedIssue.id}/`, updateForm);
-            alert("Issue updated successfully");
+            toast.success("Issue updated successfully");
             fetchIssues();
             setSelectedIssue(prev => ({ ...prev, ...updateForm }));
         } catch (err) {
             console.error(err);
-            alert("Failed to update issue");
+            toast.error("Failed to update issue");
         } finally {
             setUpdating(false);
         }

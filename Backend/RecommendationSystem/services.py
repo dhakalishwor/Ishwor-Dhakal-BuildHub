@@ -3,23 +3,19 @@ from .models import Project
 
 
 def recommend_contractors_for_project(project: Project):
-    category_label = dict(Project.CATEGORY_CHOICES).get(project.category, project.category)
-
-    if not category_label:
-        return []
-
-    all_contractors = Contractor.objects.all()
+    cat_code = str(project.category).strip().lower()
+    cat_label = str(dict(Project.CATEGORY_CHOICES).get(project.category, "")).strip().lower()
     
-    wanted = str(category_label).strip().lower()
+    wanted = {cat_code, cat_label}
     matched = []
 
+    all_contractors = Contractor.objects.all()
     for contractor in all_contractors:
         status = str(getattr(contractor, "availability_status", "") or "").strip().lower()
         if status != "available":
             continue
 
         types = contractor.project_types or []
-        
         normalized_types = []
         if isinstance(types, str):
             normalized_types = [t.strip().lower() for t in types.split(",")]
@@ -32,7 +28,7 @@ def recommend_contractors_for_project(project: Project):
         else:
             continue
 
-        if wanted in normalized_types:
+        if any(w in normalized_types for w in wanted):
             matched.append(contractor)
 
     matched.sort(

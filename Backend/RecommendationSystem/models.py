@@ -20,6 +20,7 @@ class Project(models.Model):
 
     PAYMENT_STATUS_CHOICES = [
         ("UNPAID", "Unpaid"),
+        ("PARTIALLY_PAID", "Partially Paid"),
         ("PAID", "Paid"),
     ]
 
@@ -75,7 +76,7 @@ class Project(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     payment_status = models.CharField(
-        max_length=10,
+        max_length=20,
         choices=PAYMENT_STATUS_CHOICES,
         default="UNPAID",
     )
@@ -86,6 +87,9 @@ class Project(models.Model):
         null=True,
         blank=True,
     )
+    advance_paid = models.BooleanField(default=False)
+    work_completed = models.BooleanField(default=False)
+    started_at = models.DateTimeField(null=True, blank=True)
     final_amount = models.PositiveIntegerField(null=True, blank=True)
 
     def __str__(self):

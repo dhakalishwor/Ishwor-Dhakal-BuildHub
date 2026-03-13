@@ -2,6 +2,8 @@ import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import api from "../../API/axios";
 import DashboardLayout from "../../components/DashboardLayout";
+import { toast } from "react-hot-toast";
+import PayWithEsewaButton from "./PayWithEsewaButton";
 
 export default function MyProjects({
     embedded = false,
@@ -11,7 +13,12 @@ export default function MyProjects({
     onRefresh: propsOnRefresh,
     onMarkCompleted: propsOnMarkCompleted,
     actionLoadingId: propsActionLoadingId,
-    recommended: propsRecommended = []
+    ratingProjectId: propsRatingProjectId,
+    setRatingProjectId: propsSetRatingProjectId,
+    onRated: propsOnRated,
+    onPaymentStarted: propsOnPaymentStarted,
+    recommended: propsRecommended = [],
+    highlightId: propsHighlightId = null
 }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -30,7 +37,7 @@ export default function MyProjects({
   const recommended = embedded ? propsRecommended : (location.state?.recommended || []);
 
   const highlightIdString = searchParams.get("project");
-  const highlightId = highlightIdString ? parseInt(highlightIdString) : location.state?.highlightId;
+  const highlightId = embedded ? propsHighlightId : (highlightIdString ? parseInt(highlightIdString) : location.state?.highlightId);
 
   const loadProjects = useCallback(async () => {
     if (embedded) return;
@@ -56,9 +63,9 @@ export default function MyProjects({
     try {
       await api.patch(`/api/projects/${projectId}/complete/`);
       await loadProjects();
-      alert("Project marked as completed!");
+      toast.success("Project marked as completed!");
     } catch (e) {
-      alert(e?.response?.data?.detail || "Failed to complete project.");
+      toast.error(e?.response?.data?.detail || "Failed to complete project.");
     } finally {
       setInternalActionLoadingId(null);
     }
@@ -166,7 +173,15 @@ export default function MyProjects({
                         {p.status}
                       </span>
 
-                      {p.status === "ACTIVE" && (
+                      {p.status === "ACTIVE" && !p.advance_paid && (
+                        <PayWithEsewaButton 
+                          projectId={p.id} 
+                          paymentType="ADVANCE" 
+                          label="Pay Advance (20%)"
+                        />
+                      )}
+
+                      {p.status === "ACTIVE" && p.advance_paid && (
                         <button
                           onClick={() => markCompleted(p.id)}
                           disabled={actionLoadingId === p.id}
@@ -186,7 +201,35 @@ export default function MyProjects({
 
                   <p className="mt-3 text-sm text-slate-700">{p.description}</p>
 
-                  <p className="mt-2 text-sm">
+                  <div className="mt-4 border-t pt-4">
+                    <h4 className="text-sm font-bold text-emerald-900 mb-3">Payment Milestones</h4>
+                    <div className="space-y-3">
+                      {(p.milestones || []).map((m) => (
+                        <div key={m.id} className="flex items-center justify-between text-sm bg-slate-50 p-2 rounded-lg border border-slate-100">
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-slate-800">{m.title}</span>
+                            <span className="text-xs text-slate-500">Rs. {m.amount}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {m.status === "PAID" ? (
+                              <span className="text-[10px] bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded uppercase">Paid</span>
+                            ) : m.status === "COMPLETED" ? (
+                              <PayWithEsewaButton 
+                                projectId={p.id} 
+                                paymentType={m.title.toLowerCase().includes("final") ? "FINAL" : "MILESTONE"} 
+                                milestoneId={m.id}
+                                label="Pay Now"
+                              />
+                            ) : (
+                               <span className="text-[10px] bg-slate-200 text-slate-600 font-bold px-2 py-0.5 rounded uppercase">{m.status}</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <p className="mt-3 text-sm">
                     Budget: <b>{p.budget}</b>
                   </p>
                 </div>

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import api from "../../API/axios";
+import { toast } from "react-hot-toast";
 
 export default function RateProject({ projectId, onSuccess, onCancel }) {
   const [rating, setRating] = useState(5);
@@ -17,13 +18,13 @@ export default function RateProject({ projectId, onSuccess, onCancel }) {
         feedback,
       });
 
-      alert("Thanks! Your rating was submitted.");
+      toast.success("Thanks! Your rating was submitted.");
       onSuccess?.();
     } catch (err) {
       const msg =
         err?.response?.data?.detail ||
         "Failed to submit rating. Make sure project is COMPLETED and not already rated.";
-      alert(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

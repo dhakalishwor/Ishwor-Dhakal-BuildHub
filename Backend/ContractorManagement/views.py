@@ -96,7 +96,7 @@ class WorkerViewSet(viewsets.ModelViewSet):
         
         profile, _ = WorkerProfile.objects.get_or_create(
             user=user,
-            defaults={"full_name": user.username, "skills": ""}
+            defaults={"full_name": user.username, "skills": "", "phone": ""}
         )
         
         if request.method == "GET":
@@ -123,6 +123,28 @@ class WorkerViewSet(viewsets.ModelViewSet):
             return Response({"detail": "Missing project_id, hiring_type, or rate."}, status=400)
             
         project = get_object_or_404(GeneralProject, id=project_id, assigned_contractor=contractor)
+        
+        if project.status != "ACTIVE":
+            return Response(
+                {"detail": "You can only hire workers for projects that are currently ACTIVE."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        # Check if worker already has an ACTIVE assignment on ANY project
+        active_assignment = ProjectAssignment.objects.filter(
+            worker=worker_profile.user, status="ACTIVE"
+        ).select_related("project").first()
+        
+        if active_assignment:
+            if active_assignment.project_id == project.id:
+                return Response(
+                    {"detail": "This worker is already assigned to this project."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            return Response(
+                {"detail": f"This worker already has an active assignment on \"{active_assignment.project.title}\". They must complete or be terminated from that project first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         
         assignment = ProjectAssignment.objects.create(
             project=project,

@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import api from "../../API/axios";
+import { toast } from "react-hot-toast";
 
 export default function SubmitBid({ projectId, onSuccess }) {
   const [proposed_price, setPrice] = useState("");
@@ -21,9 +22,9 @@ export default function SubmitBid({ projectId, onSuccess }) {
       setPrice("");
       setDays("");
       setMessage("");
-      alert("Bid submitted!");
+      toast.success("Bid submitted!");
     } catch (err) {
-      alert(err?.response?.data?.detail || "Failed to submit bid");
+      toast.error(err?.response?.data?.detail || "Failed to submit bid");
     } finally {
       setLoading(false);
     }

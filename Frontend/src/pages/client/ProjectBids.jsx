@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../API/axios";
 import DashboardLayout from "../../components/DashboardLayout";
+import { toast } from "react-hot-toast";
 
 export default function ProjectBids({ onChatStarted, embedded = false }) {
   const [projects, setProjects] = useState([]);
@@ -27,7 +28,7 @@ export default function ProjectBids({ onChatStarted, embedded = false }) {
         navigate(`/messages?conversation=${conversationId}`);
       }
     } catch (err) {
-      alert(err?.response?.data?.error || "Failed to start conversation");
+      toast.error(err?.response?.data?.error || "Failed to start conversation");
     }
   };
 
@@ -69,9 +70,9 @@ export default function ProjectBids({ onChatStarted, embedded = false }) {
       if (selectedProject) {
         fetchBids(selectedProject);
       }
-      alert(`Bid ${status.toLowerCase()} successfully!`);
+      toast.success(`Bid ${status.toLowerCase()} successfully!`);
     } catch (err) {
-      alert(err?.response?.data?.detail || "Failed to update bid");
+      toast.error(err?.response?.data?.detail || "Failed to update bid");
     }
   };
 

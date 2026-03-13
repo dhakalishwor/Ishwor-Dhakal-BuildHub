@@ -15,6 +15,9 @@ export default function useNotifications(pollIntervalMs = 30000) {
 
   //  fetch unread count (lightweight) 
   const fetchUnreadCount = useCallback(async () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token || token === "null" || token === "undefined") return;
+
     try {
       const { data } = await api.get("/api/notifications/unread-count/");
       setUnreadCount(data.unread ?? 0);
@@ -25,6 +28,9 @@ export default function useNotifications(pollIntervalMs = 30000) {
 
   //  fetch full notification list 
   const fetchNotifications = useCallback(async () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token || token === "null" || token === "undefined") return;
+
     setLoading(true);
     try {
       const { data } = await api.get("/api/notifications/");

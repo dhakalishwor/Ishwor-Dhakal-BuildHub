@@ -24,6 +24,8 @@ class WorkLog(models.Model):
     hours_worked = models.DecimalField(max_digits=5, decimal_places=2)
     description = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="PENDING")
+    payment_status = models.CharField(max_length=15, choices=(('UNPAID', 'Unpaid'), ('PAID', 'Paid')), default="UNPAID")
+    transaction_uuid = models.CharField(max_length=50, blank=True, null=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

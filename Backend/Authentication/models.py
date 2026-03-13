@@ -63,3 +63,19 @@ class ContractorLicense(models.Model):
 
     def __str__(self):
         return f"ContractorLicense({self.contractor.username}) - {self.status}"
+
+
+class ClientProfile(models.Model):
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="client_profile",
+        limit_choices_to={"role": User.ROLE_CLIENT},
+    )
+    full_name = models.CharField(max_length=255)
+    phone = models.CharField(max_length=20, blank=True)
+    address = models.CharField(max_length=255, blank=True)
+    bio = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"{self.full_name} ({self.user.username})"

@@ -97,8 +97,11 @@ class WorkerProfile(models.Model):
         choices=AVAILABILITY_CHOICES,
         default="AVAILABLE",
     )
-    phone = models.CharField(max_length=20)
+    phone = models.CharField(max_length=20, blank=True, default="")
     address = models.CharField(max_length=200, blank=True, default="")
+    bio = models.TextField(blank=True, default="")
+    experience_years = models.PositiveIntegerField(default=0)
+    specialization = models.CharField(max_length=100, blank=True, default="")
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

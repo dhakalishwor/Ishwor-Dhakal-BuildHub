@@ -10,7 +10,6 @@ class BidCreateSerializer(serializers.ModelSerializer):
         request = self.context["request"]
         user = request.user
 
-        # role check
         if getattr(user, "role", None) not in ["contractor", "worker"]:
             raise serializers.ValidationError("Only contractors or workers can place bids.")
 

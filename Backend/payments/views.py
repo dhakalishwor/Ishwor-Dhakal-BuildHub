@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 
 from RecommendationSystem.models import Project
 from BiddingSystem.models import Bid
+from ProgressTracking.models import WorkLog, ProjectAssignment
 from .models import Payment
 from .utils import esewa_generate_signature
 from NotificationSystem.utils import notify
@@ -35,42 +36,87 @@ class InitiatePaymentView(APIView):
 
     def post(self, request, project_id):
         project = get_object_or_404(Project, id=project_id)
+        payment_type = request.data.get("payment_type", "FINAL")
+        milestone_id = request.data.get("milestone_id")
 
         if project.client_id != request.user.id:
             return Response({"detail": "Not allowed"}, status=403)
 
-        if project.status != "COMPLETED":
-            return Response({"detail": "Project must be completed before payment"}, status=400)
+        # Basic validations based on payment type
+        if payment_type == "ADVANCE":
+            if project.advance_paid:
+                return Response({"detail": "Advance already paid"}, status=400)
+            if project.status != "ACTIVE":
+                return Response({"detail": "Project must be ACTIVE to pay advance"}, status=400)
+        
+        elif payment_type == "MILESTONE":
+            if not milestone_id:
+                return Response({"detail": "milestone_id is required for MILESTONE payment"}, status=400)
+            from ProgressTracking.models import Milestone
+            milestone = get_object_or_404(Milestone, id=milestone_id, project=project)
+            if milestone.status == "PAID":
+                return Response({"detail": "Milestone already paid"}, status=400)
+            if milestone.status != "COMPLETED":
+                # Final payment is also a milestone in my auto-gen, but let's check title or just allow if COMPLETED
+                return Response({"detail": "Milestone must be marked as COMPLETED by client approval before payment"}, status=400)
+        
+        elif payment_type == "FINAL":
+            if project.payment_status == "PAID":
+                return Response({"detail": "Project already fully paid"}, status=400)
+            # Typically final payment happens when project work is completed
+            # However, the user flow says "READY_FOR_FINAL_PAYMENT" status or work_completed=True
+            if not project.work_completed:
+                 # Check if there's a "Final Payment" milestone and if it's completed
+                 from ProgressTracking.models import Milestone
+                 final_m = Milestone.objects.filter(project=project, title__icontains="Final").first()
+                 if not (final_m and final_m.status == "COMPLETED"):
+                    return Response({"detail": "Project work must be completed before final payment"}, status=400)
 
-        if project.payment_status == "PAID":
-            return Response({"detail": "Project already paid"}, status=400)
+        # Get Amount
+        if payment_type == "MILESTONE":
+            from ProgressTracking.models import Milestone
+            milestone = Milestone.objects.get(id=milestone_id)
+            amount = int(milestone.amount)
+        elif payment_type == "ADVANCE":
+            from ProgressTracking.models import Milestone
+            adv_m = Milestone.objects.filter(project=project, title__icontains="Advance").first()
+            if adv_m:
+                amount = int(adv_m.amount)
+            else:
+                accepted_bid = Bid.objects.filter(project=project, status="ACCEPTED").first()
+                amount = int(accepted_bid.proposed_price * 20 / 100) if accepted_bid else 0
+        else: # FINAL
+            from ProgressTracking.models import Milestone
+            final_m = Milestone.objects.filter(project=project, title__icontains="Final").first()
+            if final_m:
+                 amount = int(final_m.amount)
+            else:
+                accepted_bid = Bid.objects.filter(project=project, status="ACCEPTED").first()
+                amount = int(accepted_bid.proposed_price) if accepted_bid else 0
 
-        accepted_bid = Bid.objects.filter(project=project, status="ACCEPTED").first()
-        if not accepted_bid:
-            return Response({"detail": "No accepted bid found"}, status=400)
+        if amount <= 0:
+            return Response({"detail": "Invalid payment amount"}, status=400)
 
-        amount = int(accepted_bid.proposed_price)
         product_code, secret_key, form_url = _get_esewa_settings()
+        transaction_uuid = f"BH-{project.id}-{payment_type[:4]}-{uuid.uuid4().hex[:6]}"
 
-        transaction_uuid = f"BH-{project.id}-{uuid.uuid4().hex[:10]}"
-
-        payment, _ = Payment.objects.update_or_create(
+        payment = Payment.objects.create(
             project=project,
-            defaults={
-                "client": request.user,
-                "amount": amount,
-                "transaction_uuid": transaction_uuid,
-                "status": "INITIATED",
-            },
+            client=request.user,
+            amount=amount,
+            transaction_uuid=transaction_uuid,
+            status="INITIATED",
+            payment_type=payment_type,
+            milestone_id=milestone_id if payment_type == "MILESTONE" else None
         )
 
         # Notify client that payment process has started
         notify(
             user=request.user,
-            title="Payment Initiated",
-            message=f"You started a payment of Rs {amount} for project \"{project.title}\". Complete the process on eSewa.",
+            title=f"{payment_type.capitalize()} Payment Initiated",
+            message=f"You started a {payment_type.lower()} payment of Rs {amount} for project \"{project.title}\".",
             type="PAYMENT",
-            link=f"/client/projects?project={project.id}",
+            link=f"/clientdashboard?menu=my-projects&project={project.id}",
         )
 
         tax_amount = 0
@@ -144,8 +190,38 @@ class PaymentVerifyView(APIView):
         if expected_signature != payload["signature"]:
             return Response({"detail": "Signature verification failed"}, status=400)
 
-        payment = get_object_or_404(Payment, transaction_uuid=payload["transaction_uuid"])
+        t_uuid = payload["transaction_uuid"]
+
+        # Worker Log Payment Verification
+        if t_uuid.startswith("WLOG-"):
+            work_log = get_object_or_404(WorkLog, transaction_uuid=t_uuid)
+            
+            if payload["status"].upper() != "COMPLETE":
+                notify(
+                    user=work_log.worker,
+                    title="Payment Failed",
+                    message=f"Contractor's payment for your log on {work_log.date} could not be successfully processed via eSewa.",
+                    type="PAYMENT",
+                    link="/worker?menu=myjobs",
+                )
+                return Response({"detail": "Worker payment not completed"}, status=400)
+            
+            work_log.payment_status = "PAID"
+            work_log.save(update_fields=["payment_status"])
+
+            notify(
+                user=work_log.worker,
+                title="Payment Received ✅",
+                message=f"You have been paid via eSewa for your work log on {work_log.date} for {work_log.project.title}.",
+                type="PAYMENT",
+                link="/worker/dashboard?menu=myjobs",
+            )
+            return Response({"detail": "Worker log payment verified successfully"}, status=200)
+
+        # Normal Client Project Payment Verification
+        payment = get_object_or_404(Payment, transaction_uuid=t_uuid)
         project = payment.project
+        payment_type = payment.payment_type
 
         if payload["status"].upper() != "COMPLETE":
             payment.status = "FAILED"
@@ -155,7 +231,7 @@ class PaymentVerifyView(APIView):
             notify(
                 user=payment.client,
                 title="Payment Failed",
-                message=f"Your payment for project \"{project.title}\" could not be completed. Please try again.",
+                message=f"Your {payment_type.lower()} payment for project \"{project.title}\" failed. Please try again.",
                 type="PAYMENT",
                 link=f"/clientdashboard?menu=my-projects&project={project.id}",
             )
@@ -165,29 +241,60 @@ class PaymentVerifyView(APIView):
         payment.transaction_code = payload.get("transaction_code", "")
         payment.save()
 
-        project.payment_status = "PAID"
-        project.payment_method = "ESEWA"
-        project.paid_at = now()
-        project.final_amount = payment.amount
-        project.save()
+        # Specific logic based on payment type
+        if payment_type == "ADVANCE":
+            project.advance_paid = True
+            project.payment_status = "PARTIALLY_PAID"
+            project.started_at = now()
+            project.save()
+            
+            # Mark the Advance milestone as PAID
+            from ProgressTracking.models import Milestone
+            adv_m = Milestone.objects.filter(project=project, title__icontains="Advance").first()
+            if adv_m:
+                adv_m.status = "PAID"
+                adv_m.save()
 
-        # Notify client — payment confirmed
+        elif payment_type == "MILESTONE":
+            if payment.milestone:
+                payment.milestone.status = "PAID"
+                payment.milestone.save()
+            
+            if project.payment_status == "UNPAID":
+                project.payment_status = "PARTIALLY_PAID"
+                project.save()
+
+        elif payment_type == "FINAL":
+            project.payment_status = "PAID"
+            project.status = "COMPLETED"
+            project.paid_at = now()
+            project.final_amount = payment.amount # Usually set to total or last milestone amount
+            project.save()
+
+            # Mark the Final milestone as PAID
+            from ProgressTracking.models import Milestone
+            final_m = Milestone.objects.filter(project=project, title__icontains="Final").first()
+            if final_m:
+                final_m.status = "PAID"
+                final_m.save()
+
+        # Notify — payment confirmed
         notify(
             user=payment.client,
             title="Payment Successful ✅",
-            message=f"Your payment of Rs {payment.amount} for project \"{project.title}\" was successful.",
+            message=f"Your {payment_type.lower()} payment of Rs {payment.amount} for \"{project.title}\" was successful.",
             type="PAYMENT",
-            link=f"/client/projects?project={project.id}",
+            link=f"/clientdashboard?menu=my-projects&project={project.id}",
         )
 
-        # Notify assigned contractor — payment received
+        # Notify assigned contractor
         if project.assigned_contractor:
             notify(
                 user=project.assigned_contractor,
                 title="Payment Received",
-                message=f"The client has paid Rs {payment.amount} for project \"{project.title}\".",
+                message=f"A {payment_type.lower()} payment of Rs {payment.amount} for project \"{project.title}\" has been received.",
                 type="PAYMENT",
-                link=f"/contractor?menu=bids&project={project.id}",
+                link=f"/contractor?menu=projects&project={project.id}",
             )
 
         return Response({"detail": "Payment verified successfully"}, status=200)
@@ -196,10 +303,40 @@ class WorkerPaymentsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        if request.user.role == 'worker':
+            # Return payments (work logs) for the worker
+            work_logs = WorkLog.objects.filter(worker=request.user).select_related('project').order_by("-date")
+            data = []
+            for log in work_logs:
+                # Find the most recent assignment to get the rate, regardless of current status
+                assignment = ProjectAssignment.objects.filter(
+                    worker=request.user, 
+                    project=log.project
+                ).order_by("-assigned_at").first()
+                
+                # Calculate amount similar to InitiateWorkerPaymentView
+                try:
+                    if assignment:
+                        amount = int((assignment.rate / 8) * log.hours_worked)
+                        if amount < 10:
+                            amount = int(assignment.rate) if assignment.rate >= 10 else 10
+                    else:
+                        amount = 0
+                except Exception:
+                    amount = 0
+
+                data.append({
+                    "id": log.id,
+                    "project_title": log.project.title,
+                    "amount": amount,
+                    "status": log.payment_status or "UNPAID",
+                    "date": log.date.strftime("%Y-%m-%d"),
+                })
+            return Response(data)
+        
         # Return payments for projects where the user is the assigned contractor
         payments = Payment.objects.filter(project__assigned_contractor=request.user).order_by("-created_at")
         
-        # We can simplify the response or use a serializer
         data = []
         for p in payments:
             data.append({
@@ -236,3 +373,71 @@ class PaymentFailureView(APIView):
 
     def post(self, request):
         return self._handle_cancel(request)
+
+class InitiateWorkerPaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, log_id):
+        work_log = get_object_or_404(WorkLog, id=log_id)
+        
+        # Verify the user is the contractor assigned to this project
+        if request.user.role != 'contractor' or work_log.project.assigned_contractor != request.user:
+            return Response({"detail": "Not authorized to pay this log"}, status=403)
+            
+        if work_log.status != 'APPROVED':
+            return Response({"detail": "Only approved logs can be paid"}, status=400)
+            
+        if work_log.payment_status == 'PAID':
+            return Response({"detail": "Log is already paid"}, status=400)
+            
+        assignment = ProjectAssignment.objects.filter(worker=work_log.worker, project=work_log.project, status='ACTIVE').first()
+        if not assignment:
+            return Response({"detail": "Active project assignment not found."}, status=400)
+
+        # Calculate amount: assume rate is daily, divided by 8 hours 
+        # (Since amount needs to be an integer for eSewa, we cast it)
+        try:
+            amount = int((assignment.rate / 8) * work_log.hours_worked)
+            if amount < 10:  # eSewa might have a minimum transaction amount, setting a basic floor
+                amount = int(assignment.rate) if assignment.rate >= 10 else 10
+        except Exception:
+            amount = int(assignment.rate) if assignment.rate else 100
+
+        product_code, secret_key, form_url = _get_esewa_settings()
+        transaction_uuid = f"WLOG-{work_log.id}-{uuid.uuid4().hex[:6]}"
+        
+        work_log.transaction_uuid = transaction_uuid
+        work_log.save(update_fields=["transaction_uuid"])
+
+        tax_amount = 0
+        service_charge = 0
+        delivery_charge = 0
+        total_amount = amount + tax_amount + service_charge + delivery_charge
+
+        signed_field_names = "total_amount,transaction_uuid,product_code"
+        message = (
+            f"total_amount={total_amount},"
+            f"transaction_uuid={transaction_uuid},"
+            f"product_code={product_code}"
+        )
+        signature = esewa_generate_signature(secret_key, message)
+
+        return Response(
+            {
+                "esewa_form_url": form_url,
+                "payload": {
+                    "amount": str(amount),
+                    "tax_amount": str(tax_amount),
+                    "total_amount": str(total_amount),
+                    "transaction_uuid": transaction_uuid,
+                    "product_code": product_code,
+                    "product_service_charge": str(service_charge),
+                    "product_delivery_charge": str(delivery_charge),
+                    "success_url": settings.ESEWA_SUCCESS_URL,
+                    "failure_url": settings.ESEWA_FAILURE_URL,
+                    "signed_field_names": signed_field_names,
+                    "signature": signature,
+                },
+            },
+            status=200,
+        )

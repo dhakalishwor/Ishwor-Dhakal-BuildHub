@@ -2,6 +2,8 @@ import React, { useMemo, useState, useEffect, useCallback } from "react";
 import api from "../../API/axios";
 import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import NotificationBell from "../../components/NotificationBell";
+import { toast } from "react-hot-toast";
+import { confirmToast } from "../../components/ConfirmToast";
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(" ");
@@ -21,7 +23,6 @@ export default function WorkerDashboard() {
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const [loading, setLoading] = useState(false);
 
-  const [availableJobs, setAvailableJobs] = useState([]);
   const [myJobs, setMyJobs] = useState([]);
   const [payments, setPayments] = useState([]);
   const [workLogs, setWorkLogs] = useState([]);
@@ -37,19 +38,36 @@ export default function WorkerDashboard() {
   const [applyForm, setApplyForm] = useState({ message: "" });
   const [applyLoading, setApplyLoading] = useState(false);
   const [myAssignments, setMyAssignments] = useState([]);
-  const [profile, setProfile] = useState({ fullName: "", skills: "", dailyRate: "", availability: true });
+  const [profile, setProfile] = useState({ 
+    fullName: "", 
+    skills: "", 
+    dailyRate: "", 
+    availability: true,
+    bio: "",
+    experienceYears: 0,
+    specialization: ""
+  });
   const [profileLoading, setProfileLoading] = useState(false);
 
   const [tasks, setTasks] = useState([]);
   const [taskUpdateForm, setTaskUpdateForm] = useState({ taskId: null, description: "", photo: null });
   const [taskUpdateLoading, setTaskUpdateLoading] = useState(false);
 
-  const [projectProgressForm, setProjectProgressForm] = useState({ projectId: "", description: "", photo: null });
+  const [projectProgressForm, setProjectProgressForm] = useState({ projectId: "", milestoneId: "", description: "", photo: null });
   const [projectProgressLoading, setProjectProgressLoading] = useState(false);
   const [projectUpdates, setProjectUpdates] = useState([]);
 
   const [searchParams] = useSearchParams();
   const location = useLocation();
+
+  const handleLogout = async () => {
+    const ok = await confirmToast("Are you sure you want to logout?");
+    if (!ok) return;
+
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    navigate("/login");
+  };
 
 
   const fetchJobs = useCallback(async (discovery = false) => {
@@ -57,7 +75,6 @@ export default function WorkerDashboard() {
       const res = await api.get(discovery ? "/api/projects/?discovery=true" : "/api/projects/");
       const data = res.data || [];
       if (discovery) {
-        setAvailableJobs(data.filter(j => j.status === "BIDDING"));
         setSubJobs(data.filter(j => j.status === "ACTIVE"));
       } else {
         setMyJobs(data.filter(j => j.status === "ACTIVE" || j.status === "COMPLETED"));
@@ -103,7 +120,7 @@ export default function WorkerDashboard() {
   const fetchAssignments = useCallback(async () => {
     try {
       const res = await api.get("/api/assignments/");
-      setMyAssignments((res.data || []).filter(a => a.status === 'ACTIVE'));
+      setMyAssignments((res.data || []).filter(a => a.status !== 'TERMINATED'));
     } catch (err) { console.error("fetchAssignments failed", err); }
   }, []);
 
@@ -126,10 +143,13 @@ export default function WorkerDashboard() {
       const res = await api.get("/api/workers/me/");
       if (res.data) {
         setProfile({
-          fullName: res.data.full_name || "",
+          fullName: res.data.fullName || "",
           skills: res.data.skills || "",
-          dailyRate: res.data.daily_rate || "",
-          availability: res.data.availability_status === "AVAILABLE"
+          dailyRate: res.data.dailyRate || "",
+          availability: res.data.availabilityStatus === "AVAILABLE",
+          bio: res.data.bio || "",
+          experienceYears: res.data.experienceYears || 0,
+          specialization: res.data.specialization || ""
         });
       }
     } catch (err) { console.error("fetchProfile failed", err); }
@@ -145,13 +165,11 @@ export default function WorkerDashboard() {
           fetchWorkLogs(),
           fetchMilestones(),
           fetchMyBids(),
-          fetchJobs(true), // for sub-jobs/available
+          fetchJobs(), // for sub-jobs
           fetchSubJobApps(),
           fetchAssignments(),
           fetchProgressUpdates()
         ]);
-      } else if (activeMenu === "available") {
-        await Promise.all([fetchJobs(true), fetchMyBids()]);
       } else if (activeMenu === "myjobs") {
         await Promise.all([fetchJobs(), fetchMilestones(), fetchAssignments()]);
       } else if (activeMenu === "mytasks") {
@@ -192,8 +210,11 @@ export default function WorkerDashboard() {
   // active project filter for logs
   const [projectFilter, setProjectFilter] = useState("");
 
-  // derive list of projects I can log for (ones I'm assigned to)
-  const availableLogProjects = myJobs.filter(j => myAssignments.some(a => a.project === j.id));
+  // derive list of projects I can log for (ones I'm actively assigned to AND project is ACTIVE)
+  const availableLogProjects = myJobs.filter(j => 
+    j.status === "ACTIVE" && 
+    myAssignments.some(a => a.project === j.id && a.status === "ACTIVE")
+  );
 
   // derived logs according to selected filter
   const displayedLogs = projectFilter
@@ -209,7 +230,7 @@ export default function WorkerDashboard() {
     e.preventDefault();
     // prevent duplicate entry for same project/date
     if (workLogs.some(l => String(l.project) === String(logForm.project) && l.date === logForm.date)) {
-      alert("You already logged work for this project on that date.");
+      toast.error("You already logged work for this project on that date.");
       return;
     }
     setLogLoading(true);
@@ -222,10 +243,10 @@ export default function WorkerDashboard() {
       });
       setLogForm({ project: "", hours: "", date: new Date().toISOString().split('T')[0], description: "" });
       fetchWorkLogs();
-      alert("Work log submitted!");
+      toast.success("Work log submitted!");
     } catch (err) {
       console.error(err);
-      alert("Failed to log work.");
+      toast.error("Failed to log work.");
     } finally {
       setLogLoading(false);
     }
@@ -253,11 +274,11 @@ export default function WorkerDashboard() {
         description: editLogForm.description
       });
       fetchWorkLogs();
-      alert("Work log updated!");
+      toast.success("Work log updated!");
       setEditLogModalOpen(false);
     } catch (err) {
       console.error(err);
-      alert("Failed to update log.");
+      toast.error("Failed to update log.");
     } finally {
       setEditLogLoading(false);
     }
@@ -267,10 +288,10 @@ export default function WorkerDashboard() {
     try {
       await api.post(`/api/milestones/${milestoneId}/complete/`);
       fetchMilestones();
-      alert("Milestone marked as completed!");
+      toast.success("Milestone marked as completed!");
     } catch (err) {
       console.error(err);
-      alert("Failed to complete milestone.");
+      toast.error("Failed to complete milestone.");
     }
   }
 
@@ -286,13 +307,13 @@ export default function WorkerDashboard() {
         daily_rate: bidForm.dailyRate,
         message: bidForm.message,
       });
-      alert("Bid submitted successfully!");
+      toast.success("Bid submitted successfully!");
       setBiddingJob(null);
       setBidForm({ price: "", days: "", dailyRate: "", message: "" });
       fetchMyBids();
       fetchJobs(true);
     } catch (err) {
-      alert(err?.response?.data?.detail || "Failed to submit bid.");
+      toast.error(err?.response?.data?.detail || "Failed to submit bid.");
     } finally {
       setBidLoading(false);
     }
@@ -307,13 +328,13 @@ export default function WorkerDashboard() {
         project: applyingJob.id,
         message: applyForm.message
       });
-      alert("Application sent successfully!");
+      toast.success("Application sent successfully!");
       setApplyingJob(null);
       setApplyForm({ message: "" });
       fetchSubJobApps();
     } catch (err) {
       console.error(err);
-      alert("Failed to send application.");
+      toast.error(err?.response?.data?.[0] || err?.response?.data?.detail || "Failed to send application.");
     } finally {
       setApplyLoading(false);
     }
@@ -323,17 +344,23 @@ export default function WorkerDashboard() {
     e.preventDefault();
     setProfileLoading(true);
     try {
-      await api.patch("/api/workers/me/", {
-        full_name: profile.fullName,
-        skills: profile.skills,
-        daily_rate: profile.dailyRate,
-        availability_status: profile.availability ? "AVAILABLE" : "BUSY"
+      const formData = new FormData();
+      formData.append("fullName", profile.fullName);
+      formData.append("skills", profile.skills);
+      formData.append("dailyRate", profile.dailyRate);
+      formData.append("availabilityStatus", profile.availability ? "AVAILABLE" : "UNAVAILABLE");
+      formData.append("bio", profile.bio);
+      formData.append("experienceYears", profile.experienceYears);
+      formData.append("specialization", profile.specialization);
+
+      await api.patch("/api/workers/me/", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
       });
-      alert("Profile updated successfully!");
+      toast.success("Profile updated!");
       fetchProfile();
     } catch (err) {
       console.error(err);
-      alert("Failed to update profile.");
+      toast.error("Failed to update profile.");
     } finally {
       setProfileLoading(false);
     }
@@ -351,12 +378,12 @@ export default function WorkerDashboard() {
       await api.post(`/api/tasks/${taskUpdateForm.taskId}/submit-update/`, formData, {
         headers: { "Content-Type": "multipart/form-data" }
       });
-      alert("Task update submitted!");
+      toast.success("Task update submitted!");
       setTaskUpdateForm({ taskId: null, description: "", photo: null });
       fetchTasks();
     } catch (err) {
       console.error(err);
-      alert("Failed to submit task update.");
+      toast.error("Failed to submit task update.");
     } finally {
       setTaskUpdateLoading(false);
     }
@@ -367,6 +394,9 @@ export default function WorkerDashboard() {
     setProjectProgressLoading(true);
     const formData = new FormData();
     formData.append("project", projectProgressForm.projectId);
+    if (projectProgressForm.milestoneId) {
+      formData.append("milestone", projectProgressForm.milestoneId);
+    }
     formData.append("description", projectProgressForm.description);
     if (projectProgressForm.photo) {
       formData.append("photo", projectProgressForm.photo);
@@ -375,15 +405,15 @@ export default function WorkerDashboard() {
       await api.post("/api/progress-updates/", formData, {
         headers: { "Content-Type": "multipart/form-data" }
       });
-      alert("Project progress update submitted!");
-      setProjectProgressForm({ projectId: "", description: "", photo: null });
+      toast.success("Project progress update submitted!");
+      setProjectProgressForm({ projectId: "", milestoneId: "", description: "", photo: null });
       if (activeMenu === "dashboard" || activeMenu === "project-progress") {
         fetchProgressUpdates();
         fetchJobs();
       }
     } catch (err) {
       console.error(err);
-      alert("Failed to submit progress update.");
+      toast.error(err?.response?.data?.detail || "Failed to submit progress update.");
     } finally {
       setProjectProgressLoading(false);
     }
@@ -391,16 +421,17 @@ export default function WorkerDashboard() {
 
   const stats = useMemo(() => {
     const active = myJobs.filter((j) => (j.status || "").toUpperCase() === "ACTIVE").length;
-    const completed = myJobs.filter((j) => (j.status || "").toUpperCase() === "COMPLETED").length;
+    const completedDirect = myJobs.filter((j) => (j.status || "").toUpperCase() === "COMPLETED").length;
+    const completedAssigned = myAssignments.filter((a) => (a.status || "").toUpperCase() === "COMPLETED").length;
+    const completed = completedDirect + completedAssigned;
     const pendingPay = payments.filter((p) => (p.status || "").toUpperCase() !== "PAID").length;
 
     return {
-      available: availableJobs.length,
       active,
       completed,
       pendingPay,
     };
-  }, [availableJobs, myJobs, payments]);
+  }, [myJobs, payments]);
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
@@ -417,15 +448,6 @@ export default function WorkerDashboard() {
           </div>
 
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => {
-                setActiveMenu("available");
-                navigate("/worker/dashboard?menu=available", { replace: true });
-              }}
-              className="rounded-xl bg-emerald-900 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-950"
-            >
-              Available Jobs
-            </button>
             <NotificationBell />
           </div>
         </div>
@@ -437,7 +459,6 @@ export default function WorkerDashboard() {
             <p className="text-xs uppercase tracking-wider text-emerald-200">Worker Menu</p>
             {[
               { key: "dashboard", label: "Dashboard" },
-              { key: "available", label: "Available Jobs" },
               { key: "myjobs", label: "My Jobs" },
               { key: "mytasks", label: "My Tasks" },
               { key: "project-progress", label: "Project Progress" },
@@ -459,6 +480,13 @@ export default function WorkerDashboard() {
                 <span className="font-semibold">{item.label}</span>
               </button>
             ))}
+            
+            <button
+              onClick={handleLogout}
+              className="mt-6 w-full rounded-xl px-4 py-3 text-left transition font-semibold text-red-200 hover:bg-red-900/50 hover:text-white"
+            >
+              Logout
+            </button>
           </div>
         </aside>
 
@@ -587,8 +615,7 @@ export default function WorkerDashboard() {
                   <h1 className="text-2xl font-bold text-emerald-900">Overview</h1>
                   <p className="mt-1 text-sm text-slate-600">Your work and payment summary.</p>
 
-                  <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <StatCard title="Available Jobs" value={stats.available} />
+                  <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <StatCard title="Active Jobs" value={stats.active} />
                     <StatCard title="Completed Jobs" value={stats.completed} />
                     <StatCard title="Pending Payments" value={stats.pendingPay} />
@@ -652,10 +679,11 @@ export default function WorkerDashboard() {
                       </div>
                       <div className="sm:col-span-2">
                         <button
-                          disabled={logLoading}
-                          className="w-full rounded-xl bg-emerald-700 py-3 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50"
+                          disabled={logLoading || availableLogProjects.length === 0}
+                          className="w-full rounded-xl bg-emerald-700 py-3 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50 disabled:bg-slate-400 disabled:cursor-not-allowed"
                         >
-                          {logLoading ? "Submitting..." : "Submit Log"}
+                          {logLoading ? "Submitting..." : 
+                           availableLogProjects.length === 0 ? "No Active Assignments" : "Submit Log"}
                         </button>
                       </div>
                     </form>
@@ -690,6 +718,7 @@ export default function WorkerDashboard() {
                             <th className="px-6 py-3">Project</th>
                             <th className="px-6 py-3">Hours</th>
                             <th className="px-6 py-3">Status</th>
+                            <th className="px-6 py-3">Payment</th>
                             <th className="px-6 py-3">Actions</th>
                           </tr>
                         </thead>
@@ -702,9 +731,18 @@ export default function WorkerDashboard() {
                               <td className="px-6 py-4">
                                 <span className={classNames(
                                   "rounded-full px-2 py-1 text-xs font-semibold",
-                                  log.status === "APPROVED" ? "bg-emerald-100 text-emerald-700" : "bg-yellow-100 text-yellow-700"
+                                  log.status === "APPROVED" ? "bg-emerald-100 text-emerald-700" :
+                                  log.status === "REJECTED" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"
                                 )}>
                                   {log.status}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className={classNames(
+                                  "rounded-full px-2 py-1 text-xs font-semibold",
+                                  log.payment_status === "PAID" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
+                                )}>
+                                  {log.payment_status || "UNPAID"}
                                 </span>
                               </td>
                               <td className="px-6 py-4">
@@ -790,48 +828,6 @@ export default function WorkerDashboard() {
                 </>
               )}
 
-              {activeMenu === "available" && (
-                <div>
-                  <h1 className="text-2xl font-bold text-emerald-900">Available Jobs</h1>
-                  <p className="mt-1 text-sm text-slate-600">Find new projects to work on.</p>
-
-                  <div className="mt-6 grid gap-4">
-                    {availableJobs.map(job => (
-                      <div key={job.id} className="rounded-2xl border bg-white p-6 shadow-sm">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-bold text-emerald-900 text-lg">{job.title}</h3>
-                            <p className="text-sm text-slate-500">{job.category} • {job.location}</p>
-                          </div>
-                          {myBids.some(b => b.project === job.id) ? (
-                            <span className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-500">
-                              Bid Sent
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => setBiddingJob(job)}
-                              className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800"
-                            >
-                              Bid Now
-                            </button>
-                          )}
-                        </div>
-                        <p className="mt-3 text-sm text-slate-700 line-clamp-2">{job.description}</p>
-                        <div className="mt-4 flex gap-4 text-sm">
-                          <p>Budget: <span className="font-bold">NPR {job.budget}</span></p>
-                          <p>Type: <span className="font-bold uppercase">{job.hiring_model}</span></p>
-                        </div>
-                      </div>
-                    ))}
-                    {availableJobs.length === 0 && !loading && (
-                      <div className="text-center py-12 rounded-2xl border-2 border-dashed">
-                        <p className="text-slate-400">No projects available for bidding at the moment.</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
               {activeMenu === "subjobs" && (
                 <div>
                   <h1 className="text-2xl font-bold text-emerald-900">Sub-Jobs</h1>
@@ -848,6 +844,10 @@ export default function WorkerDashboard() {
                           {subJobApplications.some(a => a.project === job.id) ? (
                             <span className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-500">
                               Applied
+                            </span>
+                          ) : myAssignments.some(a => a.status === "ACTIVE") ? (
+                            <span className="rounded-xl bg-red-50 px-4 py-2 text-xs font-bold text-red-500">
+                              Complete current assignment first
                             </span>
                           ) : (
                             <button
@@ -922,7 +922,13 @@ export default function WorkerDashboard() {
                   <p className="mt-1 text-sm text-slate-600">Manage your professional information and availability.</p>
 
                   <div className="mt-8 max-w-2xl rounded-2xl border bg-white p-6 shadow-sm">
-                    <form onSubmit={handleUpdateProfile} className="space-y-6">
+                    <form onSubmit={handleUpdateProfile} className="space-y-6">                      <div className="flex flex-col sm:flex-row gap-6 items-center bg-slate-50 p-6 rounded-2xl border border-dashed">
+                        <div className="flex-1 space-y-1 text-center sm:text-left">
+                          <h3 className="font-bold text-emerald-900">{profile.fullName || "Your Name"}</h3>
+                          <p className="text-sm text-slate-500">{profile.specialization || "No specialization set"}</p>
+                        </div>
+                      </div>
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
                           <label className="text-xs font-bold text-slate-500 uppercase">Full Name</label>
@@ -944,6 +950,36 @@ export default function WorkerDashboard() {
                             className="mt-1 w-full rounded-xl border p-3 text-sm focus:ring-emerald-500"
                           />
                         </div>
+                        <div>
+                          <label className="text-xs font-bold text-slate-500 uppercase">Specialization</label>
+                          <input
+                            type="text"
+                            value={profile.specialization}
+                            onChange={(e) => setProfile({ ...profile, specialization: e.target.value })}
+                            className="mt-1 w-full rounded-xl border p-3 text-sm focus:ring-emerald-500"
+                            placeholder="e.g. Master Mason"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-slate-500 uppercase">Years of Experience</label>
+                          <input
+                            type="number"
+                            value={profile.experienceYears}
+                            onChange={(e) => setProfile({ ...profile, experienceYears: e.target.value })}
+                            className="mt-1 w-full rounded-xl border p-3 text-sm focus:ring-emerald-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Bio / Description</label>
+                        <textarea
+                          value={profile.bio}
+                          onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
+                          className="mt-1 w-full rounded-xl border p-3 text-sm focus:ring-emerald-500"
+                          rows={3}
+                          placeholder="Tell us about yourself..."
+                        />
                       </div>
 
                       <div>
@@ -1008,19 +1044,21 @@ export default function WorkerDashboard() {
                               <p className="text-emerald-700">Rate: NPR {a.rate}</p>
                               <p className="text-slate-500 uppercase">{a.hiring_type}</p>
                             </div>
-                            <div className="mt-4 pt-4 border-t border-emerald-100">
-                              <button
-                                onClick={() => {
-                                  setLogForm({ ...logForm, project: a.project });
-                                  setActiveMenu("dashboard");
-                                  navigate("/worker/dashboard?menu=dashboard", { replace: true });
-                                  window.scrollTo({ top: 400, behavior: "smooth" });
-                                }}
-                                className="text-xs font-bold text-emerald-700 hover:underline"
-                              >
-                                Log Work for this Project →
-                              </button>
-                            </div>
+                            {a.status === "ACTIVE" && (
+                              <div className="mt-4 pt-4 border-t border-emerald-100">
+                                <button
+                                  onClick={() => {
+                                    setLogForm({ ...logForm, project: a.project });
+                                    setActiveMenu("dashboard");
+                                    navigate("/worker/dashboard?menu=dashboard", { replace: true });
+                                    window.scrollTo({ top: 400, behavior: "smooth" });
+                                  }}
+                                  className="text-xs font-bold text-emerald-700 hover:underline"
+                                >
+                                  Log Work for this Project →
+                                </button>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -1087,13 +1125,16 @@ export default function WorkerDashboard() {
                                           )}>
                                             {m.status}
                                           </span>
-                                          {m.status === "PENDING" && (
+                                          {m.status === "PENDING" && job.status === "ACTIVE" && (
                                             <button
                                               onClick={() => handleCompleteMilestone(m.id)}
                                               className="text-xs font-bold text-emerald-700 hover:underline"
                                             >
                                               Mark Complete
                                             </button>
+                                          )}
+                                          {job.status !== "ACTIVE" && m.status === "PENDING" && (
+                                            <span className="text-[10px] text-slate-400 italic">Project closed</span>
                                           )}
                                         </div>
                                       </div>
@@ -1148,13 +1189,14 @@ export default function WorkerDashboard() {
                                   try {
                                     await api.post(`/api/tasks/${t.id}/worker-accept/`);
                                     fetchTasks();
-                                    alert("Task accepted!");
+                                    toast.success("Task accepted!");
                                   } catch (e) {
                                     console.error(e);
-                                    alert("Failed to accept task.");
+                                    toast.error("Failed to accept task.");
                                   }
                                 }}
-                                className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+                                disabled={t.project_status !== "ACTIVE"}
+                                className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
                               >
                                 Accept
                               </button>
@@ -1163,13 +1205,14 @@ export default function WorkerDashboard() {
                                   try {
                                     await api.post(`/api/tasks/${t.id}/worker-reject/`);
                                     fetchTasks();
-                                    alert("Task rejected.");
+                                    toast.success("Task rejected.");
                                   } catch (e) {
                                     console.error(e);
-                                    alert("Failed to reject task.");
+                                    toast.error("Failed to reject task.");
                                   }
                                 }}
-                                className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700"
+                                disabled={t.project_status !== "ACTIVE"}
+                                className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50"
                               >
                                 Reject
                               </button>
@@ -1178,9 +1221,10 @@ export default function WorkerDashboard() {
                             t.status !== "APPROVED" && (
                               <button
                                 onClick={() => setTaskUpdateForm({ ...taskUpdateForm, taskId: t.id })}
-                                className="rounded-xl bg-emerald-700 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-800"
+                                disabled={t.project_status !== "ACTIVE"}
+                                className="rounded-xl bg-emerald-700 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-50"
                               >
-                                Report Progress
+                                {t.project_status !== "ACTIVE" ? "Project Closed" : "Report Progress"}
                               </button>
                             )
                           )}
@@ -1263,11 +1307,33 @@ export default function WorkerDashboard() {
                           className="mt-1 w-full rounded-xl border p-3 text-sm"
                         >
                           <option value="">Select an active project</option>
-                          {myJobs.map(p => (
-                            <option key={p.id} value={p.id}>{p.title}</option>
+                          {myJobs.filter(p => p.status === "ACTIVE" && myAssignments.some(a => a.project === p.id && a.status === "ACTIVE")).map(p => (
+                            <option key={p.id} value={p.id}>
+                              {p.title} {!p.advance_paid ? "(Advance Pending)" : ""}
+                            </option>
                           ))}
                         </select>
                       </div>
+
+                      {projectProgressForm.projectId && (
+                        <div>
+                          <label className="text-xs font-bold text-slate-500 uppercase">Link to Milestone (Required for fixed price)</label>
+                          <select
+                            value={projectProgressForm.milestoneId}
+                            onChange={(e) => setProjectProgressForm({ ...projectProgressForm, milestoneId: e.target.value })}
+                            className="mt-1 w-full rounded-xl border p-3 text-sm"
+                          >
+                            <option value="">-- Associate with a Milestone --</option>
+                            {milestones
+                              .filter(m => String(m.project) === String(projectProgressForm.projectId) && m.status === 'PENDING')
+                              .map(m => (
+                                <option key={m.id} value={m.id}>{m.title} (Rs. {m.amount})</option>
+                              ))
+                            }
+                          </select>
+                          <p className="text-[10px] text-slate-400 mt-1">Linking an update to a milestone allows the client to approve and pay that milestone.</p>
+                        </div>
+                      )}
                       <div>
                         <label className="text-xs font-bold text-slate-500 uppercase">Progress Note</label>
                         <textarea
@@ -1288,12 +1354,14 @@ export default function WorkerDashboard() {
                           className="mt-1 w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
                         />
                       </div>
-                      <button
+                       <button
                         type="submit"
-                        disabled={projectProgressLoading}
-                        className="w-full rounded-xl bg-emerald-700 py-3 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50"
+                        disabled={projectProgressLoading || !projectProgressForm.projectId || myJobs.find(p => String(p.id) === String(projectProgressForm.projectId))?.status !== "ACTIVE"}
+                        className="w-full rounded-xl bg-emerald-700 py-3 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50 disabled:bg-slate-400"
                       >
-                        {projectProgressLoading ? "Posting..." : "Post Update"}
+                        {projectProgressLoading ? "Posting..." : 
+                         !projectProgressForm.projectId ? "Select a Project" :
+                         myJobs.find(p => String(p.id) === String(projectProgressForm.projectId))?.status !== "ACTIVE" ? "Project Inactive" : "Post Update"}
                       </button>
                     </form>
                   </div>

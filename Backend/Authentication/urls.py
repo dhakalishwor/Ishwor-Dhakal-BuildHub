@@ -9,9 +9,11 @@ from .views import (
     AdminLicenseReviewView
 )
 from .admin_views import AdminClientViewSet
+from .views_profile import ClientProfileViewSet
 
 router = DefaultRouter()
 router.register(r'admin/clients', AdminClientViewSet, basename='admin-clients')
+router.register(r'clients', ClientProfileViewSet, basename='clients')
 
 urlpatterns = [
     path("register/", RegisterView.as_view(), name="register"),

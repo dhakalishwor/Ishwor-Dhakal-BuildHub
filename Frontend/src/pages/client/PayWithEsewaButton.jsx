@@ -1,14 +1,18 @@
 import React, { useState } from "react";
-import api from "../API/axios";
-import { submitEsewaForm } from "../utils/esewa";
+import api from "../../API/axios";
+import { submitEsewaForm } from "../../utils/esewa";
+import { toast } from "react-hot-toast";
 
-export default function PayWithEsewaButton({ projectId }) {
+export default function PayWithEsewaButton({ projectId, paymentType = "FINAL", milestoneId = null, label = "Pay with eSewa" }) {
   const [loading, setLoading] = useState(false);
 
   const payNow = async () => {
     setLoading(true);
     try {
-      const res = await api.post(`/api/payments/initiate/${projectId}/`);
+      const res = await api.post(`/api/payments/initiate/${projectId}/`, {
+        payment_type: paymentType,
+        milestone_id: milestoneId
+      });
       console.log("PAYMENT INITIATE RESPONSE:", res.data);
 
       const esewaUrl = res.data?.esewa_form_url;
@@ -20,7 +24,7 @@ export default function PayWithEsewaButton({ projectId }) {
 
       submitEsewaForm(esewaUrl, payload);
     } catch (e) {
-      alert(e?.response?.data?.detail || e?.message || "Payment initiate failed.");
+      toast.error(e?.response?.data?.detail || e?.message || "Payment initiate failed.");
       setLoading(false);
     }
   };
@@ -31,7 +35,7 @@ export default function PayWithEsewaButton({ projectId }) {
       disabled={loading}
       className="rounded-lg bg-green-600 px-3 py-1 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-60"
     >
-      {loading ? "Redirecting..." : "Pay with eSewa"}
+      {loading ? "Redirecting..." : label}
     </button>
   );
 }

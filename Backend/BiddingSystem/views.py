@@ -11,6 +11,46 @@ from RecommendationSystem.models import Project
 from NotificationSystem.utils import notify
 
 
+def create_default_milestones(project, bid_amount):
+    """
+    Creates default milestones: Advance(20%), M1(30%), M2(30%), Final(20%)
+    """
+    from ProgressTracking.models import Milestone
+    
+    # Advance: 20%
+    Milestone.objects.create(
+        project=project,
+        title="Advance Payment",
+        description="Advance payment to start the project.",
+        amount=bid_amount * 20 / 100,
+        status="PENDING"
+    )
+    # Milestone 1: 30%
+    Milestone.objects.create(
+        project=project,
+        title="Milestone 1",
+        description="First project progress milestone.",
+        amount=bid_amount * 30 / 100,
+        status="PENDING"
+    )
+    # Milestone 2: 30%
+    Milestone.objects.create(
+        project=project,
+        title="Milestone 2",
+        description="Second project progress milestone.",
+        amount=bid_amount * 30 / 100,
+        status="PENDING"
+    )
+    # Final: 20%
+    Milestone.objects.create(
+        project=project,
+        title="Final Payment",
+        description="Final settlement after project completion.",
+        amount=bid_amount * 20 / 100,
+        status="PENDING"
+    )
+
+
 class BidCreateView(generics.CreateAPIView):
     serializer_class = BidCreateSerializer
     permission_classes = [IsAuthenticated, IsContractor]
@@ -81,6 +121,9 @@ class UpdateBidStatusView(generics.UpdateAPIView):
 
             project.status = "ACTIVE"
             project.save()
+
+            # Create default payment plan (milestones)
+            create_default_milestones(project, bid.proposed_price)
 
             # Notify winning contractor their bid was accepted
             notify(

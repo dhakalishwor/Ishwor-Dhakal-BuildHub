@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { confirmToast } from "./ConfirmToast";
 
 function classNames(...classes) {
     return classes.filter(Boolean).join(" ");
@@ -24,6 +25,7 @@ export default function Sidebar({ role, activeMenu, onItemClick }) {
     const contractorItems = [
         { key: "profile", label: "Manage Profile", path: "/contractor" },
         { key: "projects", label: "Available Projects", path: "/contractor" },
+        { key: "accepted-projects", label: "My Projects", path: "/contractor" },
         { key: "bids", label: "My Bids", path: "/contractor" },
         { key: "manage-tasks", label: "Manage Tasks", path: "/contractor" },
         { key: "manage-team", label: "Manage Team", path: "/contractor" },
@@ -46,6 +48,15 @@ export default function Sidebar({ role, activeMenu, onItemClick }) {
         }
     };
 
+    const handleLogout = async () => {
+        const ok = await confirmToast("Are you sure you want to logout?");
+        if (!ok) return;
+
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        navigate("/login");
+    };
+
     return (
         <aside className="border-r bg-emerald-900 text-white p-4 md:sticky md:top-[64px] h-[calc(100vh-64px)] overflow-y-auto">
             <p className="text-xs uppercase tracking-wider text-emerald-200 mb-4">{menuTitle}</p>
@@ -64,6 +75,13 @@ export default function Sidebar({ role, activeMenu, onItemClick }) {
                         {item.label}
                     </button>
                 ))}
+                
+                <button
+                    onClick={handleLogout}
+                    className="w-full rounded-xl px-4 py-3 text-left transition font-semibold mt-4 text-red-200 hover:bg-red-900/50 hover:text-white"
+                >
+                    Logout
+                </button>
             </div>
 
             <div className="mt-8 rounded-xl bg-white/10 p-4">

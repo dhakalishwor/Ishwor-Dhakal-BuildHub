@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import api from "../../API/axios";
+import { toast } from "react-hot-toast";
+import { promptToast } from "../../components/ConfirmToast";
 
 // utility to combine class names conditionally (mimics common classNames helper)
 function classNames(...classes) {
@@ -13,6 +15,7 @@ import MyProjects from "../client/MyProjects";
 import CostEstimator from "../client/CostEstimator";
 import Sidebar from "../../components/Sidebar";
 import NotificationBell from "../../components/NotificationBell";
+import PayWithEsewaButton from "../client/PayWithEsewaButton";
 
 function normalizeProject(p) {
   return {
@@ -29,60 +32,14 @@ function normalizeProject(p) {
     final_amount: p.final_amount ?? null,
     hiring_model: p.hiring_model || "PER_PROJECT",
     daily_rate: p.daily_rate || null,
+    contractor_details: p.contractor_details || null,
+    assigned_workers: p.assigned_workers || [],
+    advance_paid: p.advance_paid,
+    work_completed: p.work_completed,
+    milestones: p.milestones || [],
   };
 }
 
-function submitEsewaForm(url, payload) {
-  const form = document.createElement("form");
-  form.method = "POST";
-  form.action = url;
-
-  Object.entries(payload).forEach(([key, value]) => {
-    const input = document.createElement("input");
-    input.type = "hidden";
-    input.name = key;
-    input.value = String(value ?? "");
-    form.appendChild(input);
-  });
-
-  document.body.appendChild(form);
-  form.submit();
-  form.remove();
-}
-
-function PayWithEsewaButton({ projectId, onStarted }) {
-  const [loading, setLoading] = useState(false);
-
-  async function handlePay() {
-    setLoading(true);
-    try {
-      const res = await api.post(`/api/payments/initiate/${projectId}/`);
-
-      const esewaFormUrl = res.data?.esewa_form_url;
-      const payload = res.data?.payload;
-
-      if (!esewaFormUrl) throw new Error("esewa_form_url missing from backend response.");
-      if (!payload) throw new Error("payload missing from backend response.");
-
-      if (onStarted) onStarted();
-
-      submitEsewaForm(esewaFormUrl, payload);
-    } catch (err) {
-      alert(err?.response?.data?.detail || err?.message || "Payment initiation failed.");
-      setLoading(false);
-    }
-  }
-
-  return (
-    <button
-      onClick={handlePay}
-      disabled={loading}
-      className="mt-2 rounded-lg bg-green-600 px-3 py-1 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-60"
-    >
-      {loading ? "Redirecting..." : "Pay with eSewa"}
-    </button>
-  );
-}
 
 function RateProject({ projectId, onDone }) {
   const [rating, setRating] = useState(5);
@@ -98,9 +55,10 @@ function RateProject({ projectId, onDone }) {
         rating,
         feedback,
       });
+      toast.success("Rating submitted successfully!");
       onDone();
     } catch (e) {
-      alert(e?.response?.data?.detail || "Rating failed");
+      toast.error(e?.response?.data?.detail || "Rating failed");
     } finally {
       setLoading(false);
     }
@@ -152,11 +110,7 @@ function MonitoringView({ projects }) {
   async function fetchLogs() {
     setLoading(true);
     try {
-      const [logRes, milRes] = await Promise.all([
-        api.get("/api/work-logs/"),
-        api.get("/api/milestones/")
-      ]);
-      setWorkLogs(logRes.data);
+      const milRes = await api.get("/api/milestones/");
       setMilestones(milRes.data);
     } catch (err) {
       console.error(err);
@@ -178,23 +132,25 @@ function MonitoringView({ projects }) {
     try {
       await api.post(`/api/progress-updates/${updateId}/approve/`);
       fetchProjectUpdates();
-      alert("Progress update approved!");
+      fetchLogs(); // Sync milestones
+      toast.success("Progress update approved!");
     // eslint-disable-next-line no-unused-vars
     } catch (err) {
-      alert("Failed to approve update.");
+      toast.error("Failed to approve update.");
     }
   }
 
   async function handleRejectProjectUpdate(updateId) {
-    const reason = window.prompt("Enter rejection reason:");
+    const reason = await promptToast("Enter rejection reason:");
     if (reason === null) return;
     try {
       await api.post(`/api/progress-updates/${updateId}/reject/`, { rejection_reason: reason });
       fetchProjectUpdates();
-      alert("Progress update rejected.");
+      fetchLogs(); // Sync milestones
+      toast.success("Progress update rejected.");
     // eslint-disable-next-line no-unused-vars
     } catch (err) {
-      alert("Failed to reject update.");
+      toast.error("Failed to reject update.");
     }
   }
 
@@ -202,23 +158,13 @@ function MonitoringView({ projects }) {
     try {
       await api.post(`/api/work-logs/${logId}/${status.toLowerCase()}/`);
       fetchLogs();
-      alert(`Work log ${status.toLowerCase()}d!`);
+      toast.success(`Work log ${status.toLowerCase()}d!`);
     // eslint-disable-next-line no-unused-vars
     } catch (err) {
-      alert("Failed to update status.");
+      toast.error("Failed to update status.");
     }
   }
 
-  async function handleUpdateMilestoneStatus(milestoneId, status) {
-    try {
-      await api.patch(`/api/milestones/${milestoneId}/`, { status: status });
-      fetchLogs();
-      alert(`Milestone ${status.toLowerCase()}!`);
-    // eslint-disable-next-line no-unused-vars
-    } catch (err) {
-      alert("Failed to update milestone.");
-    }
-  }
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -226,48 +172,51 @@ function MonitoringView({ projects }) {
 
       <div className="space-y-8">
         <section>
-          <h2 className="text-lg font-bold text-slate-700 mb-4">Pending Work Logs (Per Day Basis)</h2>
-          <div className="overflow-hidden rounded-2xl border bg-white shadow-sm">
-            <table className="w-full text-left text-sm text-slate-500">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-700">
-                <tr>
-                  <th className="px-6 py-3">Date</th>
-                  <th className="px-6 py-3">Worker</th>
-                  <th className="px-6 py-3">Hours</th>
-                  <th className="px-6 py-3">Description</th>
-                  <th className="px-6 py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {workLogs.filter(l => l.status === "PENDING").map((log, idx) => (
-                  <tr key={`log-${log.id}-${idx}`}>
-                    <td className="px-6 py-4">{log.date}</td>
-                    <td className="px-6 py-4">{log.worker_username}</td>
-                    <td className="px-6 py-4 font-bold">{log.hours_worked}</td>
-                    <td className="px-6 py-4">{log.description}</td>
-                    <td className="px-6 py-4 flex gap-2">
-                      <button
-                        onClick={() => handleUpdateLogStatus(log.id, "APPROVE")}
-                        className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => handleUpdateLogStatus(log.id, "REJECT")}
-                        className="rounded-lg bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700"
-                      >
-                        Reject
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {workLogs.filter(l => l.status === "PENDING").length === 0 && (
-                  <tr>
-                    <td colSpan="5" className="px-6 py-4 text-center text-slate-400 italic">No pending logs found.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          <h2 className="text-lg font-bold text-slate-700 mb-4">Project Assignments (Team)</h2>
+          <div className="grid gap-4">
+            {projects.filter(p => p.status === "ACTIVE").map(p => (
+              <div key={`team-${p.id}`} className="rounded-2xl border bg-white p-6 shadow-sm">
+                <h3 className="font-bold text-emerald-900">{p.title}</h3>
+                
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+                    <p className="text-xs font-bold text-emerald-800 uppercase tracking-widest">Hired Contractor</p>
+                    {p.contractor_details ? (
+                      <div className="mt-2 flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-emerald-700 flex items-center justify-center text-white font-bold">
+                          {p.contractor_details.fullName?.[0] || "C"}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-900">{p.contractor_details.fullName}</p>
+                          <p className="text-xs text-slate-500">{p.contractor_details.specialization || "Contractor"}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-sm text-slate-400 italic">No contractor assigned yet.</p>
+                    )}
+                  </div>
+
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Assigned Workers</p>
+                    <div className="mt-3 space-y-2">
+                      {p.assigned_workers && p.assigned_workers.length > 0 ? (
+                        p.assigned_workers.map(w => (
+                          <div key={`worker-${w.id}`} className="flex items-center gap-2">
+                            <div className="h-6 w-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold">
+                              {w.fullName?.[0] || "W"}
+                            </div>
+                            <p className="text-xs font-medium text-slate-700">{w.fullName}</p>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-200 text-slate-600 font-bold uppercase">{w.hiring_type === "PER_DAY" ? "Daily" : "Project"}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-slate-400 italic">No workers assigned yet.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -292,12 +241,12 @@ function MonitoringView({ projects }) {
                             <p className="text-xs text-slate-500">NPR {m.amount} • {m.status}</p>
                           </div>
                           {m.status === "COMPLETED" && (
-                            <button
-                              onClick={() => handleUpdateMilestoneStatus(m.id, "PAID")}
-                              className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700"
-                            >
-                              Approve & Pay
-                            </button>
+                            <PayWithEsewaButton 
+                              projectId={p.id} 
+                              paymentType="MILESTONE" 
+                              milestoneId={m.id}
+                              label="Approve & Pay"
+                            />
                           )}
                         </div>
                       ))
@@ -318,7 +267,7 @@ function MonitoringView({ projects }) {
               <div key={`update-${up.id}-${idx}`} className="rounded-2xl border bg-white p-6 shadow-sm">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h3 className="font-bold text-emerald-900">Project #{up.project}</h3>
+                    <h3 className="font-bold text-emerald-900">Project #{up.project} {up.milestone_title && <span className="text-emerald-600 ml-1">({up.milestone_title})</span>}</h3>
                     <p className="text-xs text-slate-500">Posted by {up.posted_by_username} on {new Date(up.created_at).toLocaleString()}</p>
                   </div>
                   <span className={classNames(
@@ -353,6 +302,23 @@ function MonitoringView({ projects }) {
                         </button>
                       </div>
                     )}
+
+                    {up.status === "APPROVED" && up.milestone && milestones.find(m => m.id === up.milestone && m.status === "COMPLETED") && (
+                      <div className="mt-4 p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-emerald-800 font-bold uppercase tracking-wider">Payment Ready</p>
+                          <p className="text-sm text-emerald-900 font-semibold mt-1">
+                            Milestone "{milestones.find(m => m.id === up.milestone).title}" is completed.
+                          </p>
+                        </div>
+                        <PayWithEsewaButton 
+                          projectId={up.project} 
+                          paymentType="MILESTONE" 
+                          milestoneId={up.milestone} 
+                          label={`Pay Rs. ${milestones.find(m => m.id === up.milestone).amount}`}
+                        />
+                      </div>
+                    )}
                   </div>
                   {up.photo && (
                     <div className="relative group">
@@ -384,6 +350,7 @@ function MonitoringView({ projects }) {
 export default function ClientDashboard() {
 
   const navigate = useNavigate();
+  const location = useLocation();
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const [searchParams] = useSearchParams();
 
@@ -393,10 +360,19 @@ export default function ClientDashboard() {
   const [projectsError, setProjectsError] = useState("");
   const [ratingProjectId, setRatingProjectId] = useState(null);
   const [actionLoadingId, setActionLoadingId] = useState(null);
-  const [recommendedContractors, setRecommendedContractors] = useState([]);
+  const [recommendedContractors, setRecommendedContractors] = useState(location.state?.recommended || []);
+  const [highlightProjectId, setHighlightProjectId] = useState(location.state?.highlightId || null);
 
   // NEW: optional state to pass estimate info into PostProject (if you decide to use it there)
   const [prefillEstimate, setPrefillEstimate] = useState(null);
+
+  const [profile, setProfile] = useState({
+    fullName: "",
+    phone: "",
+    address: "",
+    bio: ""
+  });
+  const [profileLoading, setProfileLoading] = useState(false);
 
   async function loadProjects() {
     setLoadingProjects(true);
@@ -418,20 +394,27 @@ export default function ClientDashboard() {
     try {
       await api.patch(`/api/projects/${projectId}/complete/`);
       await loadProjects();
-      alert("Project marked as completed! Now you can pay the accepted bid amount.");
+      toast.success("Project marked as completed! Now you can pay the accepted bid amount.");
     } catch (e) {
-      alert(e?.response?.data?.detail || "Failed to complete project.");
+      toast.error(e?.response?.data?.detail || "Failed to complete project.");
     } finally {
       setActionLoadingId(null);
     }
   }
 
-  const location = useLocation();
 
   useEffect(() => {
     loadProjects();
     if (location.state?.activeMenu) {
       setActiveMenu(location.state.activeMenu);
+    }
+    
+    // Pick up recommendations from state if available
+    if (location.state?.recommended) {
+      setRecommendedContractors(location.state.recommended);
+    }
+    if (location.state?.highlightId) {
+      setHighlightProjectId(location.state.highlightId);
     }
 
     if (searchParams.get("paid") === "1") {
@@ -443,7 +426,38 @@ export default function ClientDashboard() {
     if (menuParam) {
       setActiveMenu(menuParam);
     }
-  }, [location.state?.activeMenu, searchParams]);
+
+    if (activeMenu === "profile") {
+      fetchProfile();
+    }
+  }, [location.state?.activeMenu, searchParams, activeMenu]);
+
+  async function fetchProfile() {
+    setProfileLoading(true);
+    try {
+      const res = await api.get("/api/clients/me/");
+      setProfile({
+        fullName: res.data.fullName || "",
+        phone: res.data.phone || "",
+        address: res.data.address || "",
+        bio: res.data.bio || ""
+      });
+    } catch (err) {
+      console.error("fetchProfile failed", err);
+    } finally {
+      setProfileLoading(false);
+    }
+  }
+
+  async function handleUpdateProfile(e) {
+    e.preventDefault();
+    try {
+      await api.patch("/api/clients/me/", profile);
+      toast.success("Profile updated successfully!");
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Update failed");
+    }
+  }
 
   const filteredProjects = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -490,7 +504,12 @@ export default function ClientDashboard() {
 
           <div className="flex items-center gap-4">
             <button
-              onClick={() => setActiveMenu("postproject")}
+              onClick={() => {
+                setRecommendedContractors([]);
+                setHighlightProjectId(null);
+                setActiveMenu("postproject");
+                navigate("/clientdashboard?menu=postproject", { replace: true, state: {} });
+              }}
               className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white"
             >
               Post Project
@@ -508,6 +527,8 @@ export default function ClientDashboard() {
           role="client"
           activeMenu={activeMenu}
           onItemClick={(key) => {
+            setRecommendedContractors([]);
+            setHighlightProjectId(null);
             if (key === "messages") {
               navigate("/messages");
               return;
@@ -577,7 +598,7 @@ export default function ClientDashboard() {
                         <p className="text-sm text-yellow-900 font-semibold">
                           Pay accepted bid amount to finish this project
                         </p>
-                        <PayWithEsewaButton projectId={p.id} onStarted={() => { }} />
+                        <PayWithEsewaButton projectId={p.id} />
                       </div>
                     )}
 
@@ -641,7 +662,8 @@ export default function ClientDashboard() {
               setRatingProjectId={setRatingProjectId}
               onRated={loadProjects}
               onPaymentStarted={() => { }}
-              recommendedContractors={recommendedContractors}
+              recommended={recommendedContractors}
+              highlightId={highlightProjectId}
             />
           )}
 
@@ -649,10 +671,27 @@ export default function ClientDashboard() {
             <PostProject
               embedded={true}
               prefillEstimate={prefillEstimate}
-              onCreated={(data) => {
+              onDone={() => { }} // Prevent navigation
+               onCreated={(data) => {
+                console.log("PROJECT CREATED DATA:", data);
                 loadProjects();
-                setRecommendedContractors(data.recommended_contractors || data.recommended || []);
+                const recs = data.recommended_contractors || data.recommended || [];
+                console.log("SETTING RECOMMENDED CONTRACTORS:", recs);
+                
+                // Sync BOTH local state and navigation state
+                setRecommendedContractors(recs);
+                setHighlightProjectId(data.id);
+                
+                navigate("/clientdashboard?menu=my-projects", { 
+                  replace: true, 
+                  state: { 
+                    recommended: recs,
+                    highlightId: data.id,
+                    activeMenu: "my-projects"
+                  } 
+                });
                 setActiveMenu("my-projects");
+                toast.success("Project posted! Scroll down to see details and recommendations.");
               }}
             />
           )}
@@ -662,9 +701,73 @@ export default function ClientDashboard() {
           {activeMenu === "monitoring" && <MonitoringView projects={projects} />}
 
           {activeMenu === "profile" && (
-            <div className="rounded-2xl border bg-white p-8 shadow-sm">
-              <h2 className="text-xl font-bold text-emerald-900">PROFILE</h2>
-              <p className="mt-2 text-sm text-slate-600">This page is for profile.</p>
+            <div className="max-w-4xl mx-auto">
+              <h1 className="text-2xl font-bold text-emerald-900 mb-6 font-primary">Profile Settings</h1>
+
+              <div className="rounded-3xl border bg-white p-8 shadow-sm">
+                {profileLoading ? (
+                  <div className="flex justify-center p-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-700"></div>
+                  </div>
+                ) : (
+                  <form onSubmit={handleUpdateProfile} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase text-slate-400 tracking-wider">Full name</label>
+                        <input
+                          type="text"
+                          value={profile.fullName}
+                          onChange={(e) => setProfile({ ...profile, fullName: e.target.value })}
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                          placeholder="Project Owner Name"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase text-slate-400 tracking-wider">Phone number</label>
+                        <input
+                          type="text"
+                          value={profile.phone}
+                          onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                          placeholder="98XXXXXXXX"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase text-slate-400 tracking-wider">Address</label>
+                      <input
+                        type="text"
+                        value={profile.address}
+                        onChange={(e) => setProfile({ ...profile, address: e.target.value })}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                        placeholder="Kathmandu, Nepal"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase text-slate-400 tracking-wider">Bio / Description</label>
+                      <textarea
+                        value={profile.bio}
+                        onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
+                        rows={4}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                        placeholder="Professional background, company info, interests..."
+                      />
+                    </div>
+
+                    <div className="pt-4">
+                      <button
+                        type="submit"
+                        className="rounded-xl bg-emerald-700 px-8 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-700/20 hover:bg-emerald-800 hover:shadow-emerald-700/30 transition-all active:scale-[0.98]"
+                      >
+                        Save Profile changes
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
             </div>
           )}
         </main>

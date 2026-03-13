@@ -1,9 +1,10 @@
 import React, { useMemo, useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import _api from "../../API/axios";
 import AdminIssueManagement from "./AdminIssueManagement";
 import AdminProjectMonitoring from "./AdminProjectMonitoring";
 import NotificationBell from "../../components/NotificationBell";
+import { confirmToast } from "../../components/ConfirmToast";
 
 
 const initialForm = {
@@ -57,6 +58,16 @@ export default function App() {
   const [isLoadingClients, setIsLoadingClients] = useState(false);
   
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    const ok = await confirmToast("Are you sure you want to logout?");
+    if (!ok) return;
+
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    navigate("/login");
+  };
 
   // Fetch data on mount
   useEffect(() => {
@@ -184,8 +195,8 @@ export default function App() {
       });
   }
 
-  function onDelete(id) {
-    const ok = window.confirm("Delete this contractor? This cannot be undone.");
+  async function onDelete(id) {
+    const ok = await confirmToast("Delete this contractor? This cannot be undone.");
     if (!ok) return;
     // Delete contractor from backend
     _api.delete(`/api/contractors/${id}/`)
@@ -273,8 +284,8 @@ export default function App() {
     }
   };
 
-  const onClientDelete = (id) => {
-    if (!window.confirm("Delete this client? This cannot be undone.")) return;
+  const onClientDelete = async (id) => {
+    if (!await confirmToast("Delete this client? This cannot be undone.")) return;
     _api.delete(`/auth/admin/clients/${id}/`)
       .then(() => {
         setClients(prev => prev.filter(c => c.id !== id));
@@ -375,6 +386,13 @@ export default function App() {
               <p className="mt-1 text-xs text-emerald-200">
                 Handle reports and support tickets
               </p>
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className="mt-6 w-full rounded-xl px-4 py-3 text-left transition font-semibold text-red-200 hover:bg-red-900/50 hover:text-white"
+            >
+              Logout
             </button>
           </div>
         </aside>

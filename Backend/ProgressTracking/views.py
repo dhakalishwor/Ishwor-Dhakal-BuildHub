@@ -24,8 +24,6 @@ class WorkLogViewSet(viewsets.ModelViewSet):
         elif user.role == 'worker':
             # Logs created by me or logs for projects I'm assigned to
             qs = WorkLog.objects.filter(worker=user)
-        elif user.role == 'client':
-            qs = WorkLog.objects.filter(project__client=user)
         elif user.role == 'contractor':
             # As a contractor, I want to see logs for workers I hired
             qs = WorkLog.objects.filter(project__assigned_contractor=user)
@@ -42,16 +40,33 @@ class WorkLogViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
+        project = serializer.validated_data.get('project')
+        if project.status != 'ACTIVE':
+            raise serializers.ValidationError({"detail": "You can only log work for ACTIVE projects."})
+        
+        # Also ensure assignment is active
+        assignment = ProjectAssignment.objects.filter(
+            worker=self.request.user,
+            project=project,
+            status='ACTIVE'
+        ).exists()
+        if not assignment:
+            raise serializers.ValidationError({"detail": "You must have an active assignment to log work for this project."})
+
         serializer.save(worker=self.request.user)
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
+        if instance.project.status != 'ACTIVE':
+            return Response({"detail": "Cannot modify logs for inactive projects."}, status=status.HTTP_403_FORBIDDEN)
         if request.user.role == 'worker' and instance.worker == request.user and instance.status == 'APPROVED':
             return Response({"detail": "Cannot modify an approved log."}, status=status.HTTP_403_FORBIDDEN)
         return super().update(request, *args, **kwargs)
 
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
+        if instance.project.status != 'ACTIVE':
+            return Response({"detail": "Cannot modify logs for inactive projects."}, status=status.HTTP_403_FORBIDDEN)
         if request.user.role == 'worker' and instance.worker == request.user and instance.status == 'APPROVED':
             return Response({"detail": "Cannot modify an approved log."}, status=status.HTTP_403_FORBIDDEN)
         return super().partial_update(request, *args, **kwargs)
@@ -59,8 +74,8 @@ class WorkLogViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
         work_log = self.get_object()
-        # clients and admins always allowed
-        if request.user.role in ['client', 'admin']:
+        # admins always allowed
+        if request.user.role == 'admin':
             pass
         # contractors may approve logs for projects they manage
         elif request.user.role == 'contractor':
@@ -74,9 +89,31 @@ class WorkLogViewSet(viewsets.ModelViewSet):
         return Response(WorkLogSerializer(work_log).data)
 
     @action(detail=True, methods=['post'])
+    def pay(self, request, pk=None):
+        work_log = self.get_object()
+        if request.user.role != 'contractor' or work_log.project.assigned_contractor != request.user:
+            return Response({"detail": "Not authorized to pay this log."}, status=status.HTTP_403_FORBIDDEN)
+        
+        if work_log.status != 'APPROVED':
+            return Response({"detail": "Only approved logs can be paid."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        work_log.payment_status = 'PAID'
+        work_log.save()
+        
+        from NotificationSystem.utils import notify
+        notify(
+            user=work_log.worker,
+            title="Payment Received",
+            message=f"You have been paid for your work log on {work_log.date} for {work_log.project.title}.",
+            type="PAYMENT",
+            link="/worker/dashboard?menu=myjobs",
+        )
+        return Response(WorkLogSerializer(work_log).data)
+
+    @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):
         work_log = self.get_object()
-        if request.user.role in ['client', 'admin']:
+        if request.user.role == 'admin':
             pass
         elif request.user.role == 'contractor':
             if work_log.project.assigned_contractor != request.user:
@@ -110,8 +147,9 @@ class MilestoneViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def complete(self, request, pk=None):
         milestone = self.get_object()
-        # Only worker (assigned contractor) or admin can mark as completed?
-        # Typically worker marks as completed, client approves.
+        if milestone.project.status != 'ACTIVE':
+            return Response({"detail": "Cannot complete milestones for inactive projects."}, status=400)
+            
         milestone.status = 'COMPLETED'
         milestone.completed_at = timezone.now()
         milestone.save()
@@ -174,14 +212,40 @@ class SubJobApplicationViewSet(viewsets.ModelViewSet):
         return SubJobApplication.objects.none()
 
     def perform_create(self, serializer):
-        serializer.save(worker=self.request.user)
+        user = self.request.user
+        project = serializer.validated_data.get('project')
+
+        if project and project.status != 'ACTIVE':
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("You can only apply to projects that are currently ACTIVE.")
+
+        # Block self-application if worker already has an active assignment
+        active = ProjectAssignment.objects.filter(worker=user, status="ACTIVE").first()
+        if active:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError(
+                f"You already have an active assignment on \"{active.project.title}\". "
+                "Complete or get released from your current project before applying."
+            )
+
+        serializer.save(worker=user)
 
     @action(detail=True, methods=['post'])
     def accept(self, request, pk=None):
         application = self.get_object()
         if request.user.role != 'contractor' or application.project.assigned_contractor != request.user:
             return Response({"detail": "Not authorized."}, status=403)
-        
+
+        # Check if worker already has an active assignment
+        active = ProjectAssignment.objects.filter(
+            worker=application.worker, status="ACTIVE"
+        ).select_related("project").first()
+        if active:
+            return Response(
+                {"detail": f"This worker already has an active assignment on \"{active.project.title}\". Cannot accept."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         application.status = 'ACCEPTED'
         application.save()
         
@@ -257,6 +321,9 @@ class TaskViewSet(viewsets.ModelViewSet):
         if request.user != task.assigned_to and request.user.role != 'admin':
             return Response({"detail": "Only the assigned worker can submit updates."}, status=403)
         
+        if task.project.status != 'ACTIVE':
+            return Response({"detail": "Project is no longer active. Cannot submit updates."}, status=403)
+
         # Ensure the worker still has an ACTIVE assignment for this project
         if request.user.role == 'worker':
             assignment = ProjectAssignment.objects.filter(
@@ -280,110 +347,6 @@ class TaskViewSet(viewsets.ModelViewSet):
             photo=photo
         )
         
-        # Update task status to COMPLETED if worker says so? Or just keep in progress?
-        # Let's say if it was REWORK, it goes back to IN_PROGRESS or COMPLETED
-        if task.status == 'REWORK':
-            task.status = 'IN_PROGRESS'
-            task.save()
-            
-        return Response(TaskUpdateSerializer(update).data, status=201)
-
-    @action(detail=True, methods=['post'], url_path='request-rework')
-    def request_rework(self, request, pk=None):
-        task = self.get_object()
-        if request.user != task.contractor and request.user.role != 'admin':
-            return Response({"detail": "Only the managing contractor can request rework."}, status=403)
-            
-        comments = request.data.get('comments')
-        task.status = 'REWORK'
-        task.comments = comments
-        task.save()
-        return Response(TaskSerializer(task).data)
-
-    @action(detail=True, methods=['post'], url_path='accept')
-    def contractor_accept(self, request, pk=None):
-        # contractor can mark task approved (i.e. accept completed work)
-        task = self.get_object()
-        if request.user != task.contractor and request.user.role != 'admin':
-            return Response({"detail": "Only the managing contractor can accept tasks."}, status=403)
-            
-        # Only allow accept if worker has submitted at least one update
-        if not task.updates.exists():
-            return Response({"detail": "Cannot accept task before worker submits progress update."}, status=400)
-
-        task.status = 'APPROVED'
-        task.save()
-        return Response(TaskSerializer(task).data)
-
-    @action(detail=True, methods=['post'], url_path='decline')
-    def contractor_reject(self, request, pk=None):
-        # contractor rejects completed work -> set to REWORK
-        task = self.get_object()
-        if request.user != task.contractor and request.user.role != 'admin':
-            return Response({"detail": "Only the managing contractor can reject tasks."}, status=403)
-            
-        # Only allow reject/rework if worker has submitted at least one update
-        if not task.updates.exists():
-            return Response({"detail": "Cannot request rework before worker submits progress update."}, status=400)
-
-        task.status = 'REWORK'
-        task.save()
-        return Response(TaskSerializer(task).data)
-
-    @action(detail=True, methods=['post'], url_path='worker-accept')
-    def worker_accept(self, request, pk=None):
-        task = self.get_object()
-        if request.user != task.assigned_to and request.user.role != 'admin':
-            return Response({"detail": "Only the assigned worker can accept this task."}, status=403)
-        if task.status != 'PENDING':
-            return Response({"detail": "Task is not pending."}, status=400)
-        task.status = 'IN_PROGRESS'
-        task.save()
-        return Response(TaskSerializer(task).data)
-
-    @action(detail=True, methods=['post'], url_path='worker-reject')
-    def worker_reject(self, request, pk=None):
-        task = self.get_object()
-        if request.user != task.assigned_to and request.user.role != 'admin':
-            return Response({"detail": "Only the assigned worker can reject this task."}, status=403)
-        if task.status != 'PENDING':
-            return Response({"detail": "Task is not pending."}, status=400)
-        task.status = 'REJECTED'
-        task.assigned_to = None
-        task.save()
-        return Response(TaskSerializer(task).data)
-
-    @action(detail=True, methods=['post'], url_path='submit-update')
-    def submit_update(self, request, pk=None):
-        task = self.get_object()
-        if request.user != task.assigned_to and request.user.role != 'admin':
-            return Response({"detail": "Only the assigned worker can submit updates."}, status=403)
-        
-        # Ensure the worker still has an ACTIVE assignment for this project
-        if request.user.role == 'worker':
-            assignment = ProjectAssignment.objects.filter(
-                worker=request.user,
-                project=task.project,
-                status='ACTIVE'
-            ).first()
-            if not assignment:
-                return Response({"detail": "You must have an active assignment to submit updates."}, status=403)
-        
-        description = request.data.get('description')
-        photo = request.FILES.get('photo')
-        
-        if not description:
-            return Response({"detail": "Description is required."}, status=400)
-            
-        update = TaskUpdate.objects.create(
-            task=task,
-            worker=request.user,
-            description=description,
-            photo=photo
-        )
-        
-        # Update task status to COMPLETED if worker says so? Or just keep in progress?
-        # Let's say if it was REWORK, it goes back to IN_PROGRESS or COMPLETED
         if task.status == 'REWORK':
             task.status = 'IN_PROGRESS'
             task.save()
@@ -504,6 +467,14 @@ class ProjectProgressUpdateViewSet(viewsets.ModelViewSet):
         is_contractor = project.assigned_contractor == user
         is_assigned_worker = ProjectAssignment.objects.filter(project=project, worker=user, status='ACTIVE').exists()
         
+        if project.status != 'ACTIVE':
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("You can only post progress updates to ACTIVE projects.")
+
+        if not project.advance_paid:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("You cannot post progress updates until the advance payment has been made.")
+
         if not (is_contractor or is_assigned_worker or user.role == 'admin'):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("You must have an active assignment to post progress updates.")

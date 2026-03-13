@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.db.models import Avg, Count
 from .models import Contractor, WorkerProfile
 from RecommendationSystem.models import Project
+from ProgressTracking.models import ProjectAssignment
 
 class ContractorSerializer(serializers.ModelSerializer):
     fullName = serializers.CharField(source="full_name")
@@ -74,6 +75,9 @@ class WorkerProfileSerializer(serializers.ModelSerializer):
     availabilityStatus = serializers.CharField(source="availability_status", required=False)
     dailyRate = serializers.DecimalField(source="daily_rate", max_digits=10, decimal_places=2, required=False)
     username = serializers.CharField(source="user.username", read_only=True)
+    is_available = serializers.SerializerMethodField()
+    experienceYears = serializers.IntegerField(source="experience_years", required=False)
+    current_project = serializers.SerializerMethodField()
 
     class Meta:
         model = WorkerProfile
@@ -82,9 +86,27 @@ class WorkerProfileSerializer(serializers.ModelSerializer):
             "username",
             "fullName",
             "skills",
+            "bio",
+            "experienceYears",
+            "specialization",
             "dailyRate",
             "availabilityStatus",
             "phone",
             "address",
             "created_at",
+            "is_available",
+            "current_project",
         ]
+
+    def get_is_available(self, obj):
+        return not ProjectAssignment.objects.filter(
+            worker=obj.user, status="ACTIVE"
+        ).exists()
+
+    def get_current_project(self, obj):
+        active = ProjectAssignment.objects.filter(
+            worker=obj.user, status="ACTIVE"
+        ).select_related("project").first()
+        if active:
+            return {"id": active.project.id, "title": active.project.title}
+        return None

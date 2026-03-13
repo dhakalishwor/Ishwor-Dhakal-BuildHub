@@ -106,7 +106,16 @@ export default function PostProject({ onCreated, onDone, embedded = false }) {
 
       onCreated?.(res.data);
       if (onDone) onDone();
-      else navigate("/clientdashboard");
+      else {
+        const recs = res.data.recommended_contractors || res.data.recommended || [];
+        navigate("/clientdashboard", { 
+          state: { 
+            activeMenu: "my-projects",
+            recommended: recs,
+            highlightId: res.data.id
+          } 
+        });
+      }
       setForm(initialForm);
       setMapPosition(null);
     } catch (err) {

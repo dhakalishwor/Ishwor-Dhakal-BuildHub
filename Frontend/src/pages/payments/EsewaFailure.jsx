@@ -34,7 +34,10 @@ export default function EsewaFailure() {
         {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
 
         <button
-          onClick={() => navigate("/clientdashboard")}
+          onClick={() => {
+            if (localStorage.getItem("role") === "contractor") navigate("/contractor");
+            else navigate("/clientdashboard");
+          }}
           className="mt-5 rounded-xl border px-4 py-2 text-sm hover:bg-slate-50"
         >
           Back to Dashboard

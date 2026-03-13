@@ -8,15 +8,21 @@ class Payment(models.Model):
         ("FAILED", "Failed"),
     ]
 
-    project = models.OneToOneField(
+    PAYMENT_TYPE_CHOICES = [
+        ("ADVANCE", "Advance"),
+        ("MILESTONE", "Milestone"),
+        ("FINAL", "Final"),
+    ]
+
+    project = models.ForeignKey(
         "RecommendationSystem.Project",
         on_delete=models.CASCADE,
-        related_name="payment",
+        related_name="payments",
     )
     client = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="payments",
+        related_name="user_payments",
     )
 
     amount = models.PositiveIntegerField()
@@ -25,6 +31,14 @@ class Payment(models.Model):
     transaction_code = models.CharField(max_length=30, blank=True, default="")
 
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default="INITIATED")
+    payment_type = models.CharField(max_length=15, choices=PAYMENT_TYPE_CHOICES, default="FINAL")
+    milestone = models.ForeignKey(
+        "ProgressTracking.Milestone",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="payments"
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
