@@ -3,18 +3,21 @@ from rest_framework.views import APIView
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, status
+from rest_framework import generics, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework_simplejwt.views import TokenObtainPairView
 import re
 import pytesseract
-from .models import ContractorLicense
+from .models import ContractorLicense, ClientProfile
 from .permissions import IsAdminRole
 from .serializers import (
     RegisterSerializer,
     RoleBasedTokenObtainPairSerializer,
     ContractorLicenseUploadSerializer,
+    AdminClientSerializer,
+    ClientProfileSerializer,
 )
 from .ocr_verify import verify_contractor_license
 
@@ -317,3 +320,44 @@ class AdminLicenseReviewView(APIView):
             
         license_obj.save()
         return Response({"detail": f"License marked as {new_status}."})
+
+
+class AdminClientListCreateView(generics.ListCreateAPIView):
+    """Admin can list all client users or create a new client."""
+    serializer_class = AdminClientSerializer
+    permission_classes = [IsAuthenticated, IsAdminRole]
+
+    def get_queryset(self):
+        return User.objects.filter(role=User.ROLE_CLIENT).order_by('-date_joined')
+
+
+class AdminClientDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Admin can view, update, or delete a client user."""
+    serializer_class = AdminClientSerializer
+    permission_classes = [IsAuthenticated, IsAdminRole]
+
+    def get_queryset(self):
+        return User.objects.filter(role=User.ROLE_CLIENT)
+
+
+class ClientProfileViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ClientProfileSerializer
+
+    def get_queryset(self):
+        return ClientProfile.objects.filter(user=self.request.user)
+
+    @action(detail=False, methods=['get', 'put', 'patch'])
+    def me(self, request):
+        profile, created = ClientProfile.objects.get_or_create(
+            user=request.user,
+            defaults={'full_name': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username}
+        )
+        if request.method == 'GET':
+            serializer = self.get_serializer(profile)
+            return Response(serializer.data)
+        elif request.method in ['PUT', 'PATCH']:
+            serializer = self.get_serializer(profile, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data)

@@ -1,6 +1,7 @@
 import base64
 import json
 import uuid
+from django.db import models
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.utils.timezone import now
@@ -63,14 +64,17 @@ class InitiatePaymentView(APIView):
         elif payment_type == "FINAL":
             if project.payment_status == "PAID":
                 return Response({"detail": "Project already fully paid"}, status=400)
-            # Typically final payment happens when project work is completed
-            # However, the user flow says "READY_FOR_FINAL_PAYMENT" status or work_completed=True
-            if not project.work_completed:
-                 # Check if there's a "Final Payment" milestone and if it's completed
+            if not project.work_completed and project.status != "COMPLETED":
                  from ProgressTracking.models import Milestone
                  final_m = Milestone.objects.filter(project=project, title__icontains="Final").first()
                  if not (final_m and final_m.status == "COMPLETED"):
                     return Response({"detail": "Project work must be completed before final payment"}, status=400)
+
+        elif payment_type == "REMAINING":
+            if project.payment_status == "PAID":
+                return Response({"detail": "Project already fully paid"}, status=400)
+            if project.status != "COMPLETED":
+                return Response({"detail": "Remaining payment is only available for completed projects"}, status=400)
 
         # Get Amount
         if payment_type == "MILESTONE":
@@ -85,6 +89,13 @@ class InitiatePaymentView(APIView):
             else:
                 accepted_bid = Bid.objects.filter(project=project, status="ACCEPTED").first()
                 amount = int(accepted_bid.proposed_price * 20 / 100) if accepted_bid else 0
+        elif payment_type == "REMAINING":
+            accepted_bid = Bid.objects.filter(project=project, status="ACCEPTED").first()
+            total_price = int(accepted_bid.proposed_price) if accepted_bid else int(project.budget)
+            paid_total = Payment.objects.filter(
+                project=project, status="COMPLETE"
+            ).aggregate(total=models.Sum("amount"))["total"] or 0
+            amount = total_price - int(paid_total)
         else: # FINAL
             from ProgressTracking.models import Milestone
             final_m = Milestone.objects.filter(project=project, title__icontains="Final").first()
@@ -268,15 +279,24 @@ class PaymentVerifyView(APIView):
             project.payment_status = "PAID"
             project.status = "COMPLETED"
             project.paid_at = now()
-            project.final_amount = payment.amount # Usually set to total or last milestone amount
+            project.final_amount = payment.amount
             project.save()
 
-            # Mark the Final milestone as PAID
             from ProgressTracking.models import Milestone
             final_m = Milestone.objects.filter(project=project, title__icontains="Final").first()
             if final_m:
                 final_m.status = "PAID"
                 final_m.save()
+
+        elif payment_type == "REMAINING":
+            project.payment_status = "PAID"
+            project.paid_at = now()
+            project.final_amount = payment.amount
+            project.save()
+
+            # Mark all unpaid milestones as PAID
+            from ProgressTracking.models import Milestone
+            Milestone.objects.filter(project=project).exclude(status="PAID").update(status="PAID")
 
         # Notify — payment confirmed
         notify(

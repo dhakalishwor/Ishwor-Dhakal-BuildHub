@@ -439,6 +439,30 @@ class TaskViewSet(viewsets.ModelViewSet):
         
         return actions
 
+    @action(detail=True, methods=['post'], url_path='worker-accept')
+    def worker_accept(self, request, pk=None):
+        """Worker accepts a pending task assignment."""
+        task = self.get_object()
+        if request.user != task.assigned_to:
+            return Response({"detail": "Only the assigned worker can accept this task."}, status=403)
+        if task.status != 'PENDING':
+            return Response({"detail": "Only PENDING tasks can be accepted."}, status=400)
+        task.status = 'IN_PROGRESS'
+        task.save()
+        return Response(TaskSerializer(task).data)
+
+    @action(detail=True, methods=['post'], url_path='worker-reject')
+    def worker_reject(self, request, pk=None):
+        """Worker rejects a pending task assignment."""
+        task = self.get_object()
+        if request.user != task.assigned_to:
+            return Response({"detail": "Only the assigned worker can reject this task."}, status=403)
+        if task.status != 'PENDING':
+            return Response({"detail": "Only PENDING tasks can be rejected."}, status=400)
+        task.status = 'REJECTED'
+        task.save()
+        return Response(TaskSerializer(task).data)
+
 class ProjectProgressUpdateViewSet(viewsets.ModelViewSet):
     queryset = ProjectProgressUpdate.objects.all()
     serializer_class = ProjectProgressUpdateSerializer

@@ -196,6 +196,14 @@ export default function MyProjects({
                           Already Rated
                         </span>
                       )}
+
+                      {p.status === "COMPLETED" && p.payment_status !== "PAID" && (
+                        <PayWithEsewaButton 
+                          projectId={p.id} 
+                          paymentType="REMAINING" 
+                          label="Pay Remaining Balance"
+                        />
+                      )}
                     </div>
                   </div>
 

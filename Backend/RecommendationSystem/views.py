@@ -28,6 +28,9 @@ class ProjectViewSet(ModelViewSet):
         user = self.request.user
         role = (getattr(user, "role", "") or "").upper()
 
+        if role == "ADMIN":
+            return Project.objects.all().order_by("-created_at")
+
         if role == "CLIENT":
             return Project.objects.filter(client=user).order_by("-created_at")
 
@@ -123,7 +126,8 @@ class ProjectViewSet(ModelViewSet):
             return Response({"detail": "No contractor assigned to this project."}, status=status.HTTP_400_BAD_REQUEST)
 
         project.status = "COMPLETED"
-        project.save(update_fields=["status"])
+        project.work_completed = True
+        project.save(update_fields=["status", "work_completed"])
 
         # Notify the assigned contractor that the project has been marked completed
         if project.assigned_contractor:
