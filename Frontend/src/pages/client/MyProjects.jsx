@@ -4,6 +4,7 @@ import api from "../../API/axios";
 import DashboardLayout from "../../components/DashboardLayout";
 import { toast } from "react-hot-toast";
 import PayWithEsewaButton from "./PayWithEsewaButton";
+import ProjectMap from "../../components/ProjectMap";
 
 export default function MyProjects({
     embedded = false,
@@ -124,6 +125,12 @@ export default function MyProjects({
                 <p className="text-xs text-slate-500 mt-1">
                   Project Types: {(c.projectTypes || []).join(", ")}
                 </p>
+                <button
+                  onClick={() => navigate(`/contractor-profile/${c.id}`)}
+                  className="mt-3 w-full py-1.5 rounded-lg border border-emerald-600 text-emerald-700 text-xs font-bold hover:bg-emerald-50 transition-all"
+                >
+                  View Profile
+                </button>
               </div>
             ))}
           </div>
@@ -208,6 +215,13 @@ export default function MyProjects({
                   </div>
 
                   <p className="mt-3 text-sm text-slate-700">{p.description}</p>
+                  
+                  {p.latitude && p.longitude && (
+                    <div className="mt-4">
+                      <p className="text-xs font-bold text-emerald-900 uppercase mb-2">Project Location</p>
+                      <ProjectMap latitude={p.latitude} longitude={p.longitude} title={p.title} height="200px" />
+                    </div>
+                  )}
 
                   <div className="mt-4 border-t pt-4">
                     <h4 className="text-sm font-bold text-emerald-900 mb-3">Payment Milestones</h4>

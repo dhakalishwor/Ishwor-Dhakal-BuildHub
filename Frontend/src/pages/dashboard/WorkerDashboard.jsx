@@ -4,6 +4,7 @@ import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import NotificationBell from "../../components/NotificationBell";
 import { toast } from "react-hot-toast";
 import { confirmToast } from "../../components/ConfirmToast";
+import getImageUrl from "../../utils/getImageUrl";
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(" ");
@@ -45,7 +46,8 @@ export default function WorkerDashboard() {
     availability: true,
     bio: "",
     experienceYears: 0,
-    specialization: ""
+    specialization: "",
+    profilePicture: null
   });
   const [profileLoading, setProfileLoading] = useState(false);
 
@@ -56,6 +58,7 @@ export default function WorkerDashboard() {
   const [projectProgressForm, setProjectProgressForm] = useState({ projectId: "", milestoneId: "", description: "", photo: null });
   const [projectProgressLoading, setProjectProgressLoading] = useState(false);
   const [projectUpdates, setProjectUpdates] = useState([]);
+  const [recentConversations, setRecentConversations] = useState([]);
 
   const [searchParams] = useSearchParams();
   const location = useLocation();
@@ -138,6 +141,13 @@ export default function WorkerDashboard() {
     } catch (err) { console.error("fetchProgressUpdates failed", err); }
   }, []);
 
+  const fetchRecentConversations = useCallback(async () => {
+    try {
+      const res = await api.get("/api/chat/");
+      setRecentConversations((res.data || []).slice(0, 3));
+    } catch (err) { console.error("fetchRecentConversations failed", err); }
+  }, []);
+
   const fetchProfile = useCallback(async () => {
     try {
       const res = await api.get("/api/workers/me/");
@@ -149,7 +159,9 @@ export default function WorkerDashboard() {
           availability: res.data.availabilityStatus === "AVAILABLE",
           bio: res.data.bio || "",
           experienceYears: res.data.experienceYears || 0,
-          specialization: res.data.specialization || ""
+          specialization: res.data.specialization || "",
+          profilePicture: res.data.profilePicture || null,
+          id: res.data.id
         });
       }
     } catch (err) { console.error("fetchProfile failed", err); }
@@ -168,7 +180,8 @@ export default function WorkerDashboard() {
           fetchJobs(), // for sub-jobs
           fetchSubJobApps(),
           fetchAssignments(),
-          fetchProgressUpdates()
+          fetchProgressUpdates(),
+          fetchRecentConversations()
         ]);
       } else if (activeMenu === "myjobs") {
         await Promise.all([fetchJobs(), fetchMilestones(), fetchAssignments()]);
@@ -187,9 +200,8 @@ export default function WorkerDashboard() {
     };
     load();
   }, [
-    activeMenu, fetchJobs, fetchPayments, fetchWorkLogs, fetchMilestones,
     fetchMyBids, fetchSubJobApps, fetchAssignments, fetchTasks,
-    fetchProgressUpdates, fetchProfile
+    fetchProgressUpdates, fetchProfile, fetchRecentConversations
   ]);
 
   // Sync activeMenu with URL
@@ -352,6 +364,9 @@ export default function WorkerDashboard() {
       formData.append("bio", profile.bio);
       formData.append("experienceYears", profile.experienceYears);
       formData.append("specialization", profile.specialization);
+      if (profile.profilePicture instanceof File) {
+        formData.append("profilePicture", profile.profilePicture);
+      }
 
       await api.patch("/api/workers/me/", formData, {
         headers: { "Content-Type": "multipart/form-data" }
@@ -433,6 +448,19 @@ export default function WorkerDashboard() {
     };
   }, [myJobs, payments]);
 
+  async function handleStartContractorChat(contractorId, projectId) {
+    try {
+      const res = await api.post("/api/chat/start-worker/", {
+        project_id: projectId,
+        worker_id: profile.id // This is actually user id from profile data, let's check
+      });
+      navigate("/messages", { state: { initialConversationId: res.data.id } });
+    } catch (err) {
+      console.error(err);
+      toast.error(err?.response?.data?.error || "Failed to start chat.");
+    }
+  }
+
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <header className="sticky top-0 z-10 border-b bg-white/90 backdrop-blur">
@@ -463,12 +491,17 @@ export default function WorkerDashboard() {
               { key: "mytasks", label: "My Tasks" },
               { key: "project-progress", label: "Project Progress" },
               { key: "subjobs", label: "Sub-Jobs" },
+              { key: "messages", label: "Messages" },
               { key: "payments", label: "Payments" },
               { key: "profile", label: "Profile" },
             ].map((item) => (
               <button
                 key={item.key}
                 onClick={() => {
+                  if (item.key === "messages") {
+                    navigate("/messages");
+                    return;
+                  }
                   setActiveMenu(item.key);
                   navigate(`/worker/dashboard?menu=${item.key}`, { replace: true });
                 }}
@@ -760,6 +793,52 @@ export default function WorkerDashboard() {
                     </div>
                   </div>
 
+                  {/* Recent Messages Section */}
+                  <div className="mt-8">
+                    <div className="flex items-center justify-between">
+                      <h2 className="font-bold text-emerald-900">Recent Messages</h2>
+                      <button 
+                        onClick={() => navigate("/messages")}
+                        className="text-xs font-bold text-emerald-700 hover:underline"
+                      >
+                        View All Messages
+                      </button>
+                    </div>
+                    <div className="mt-4 grid grid-cols-1 gap-4">
+                      {recentConversations.length > 0 ? (
+                        recentConversations.map(conv => (
+                          <div 
+                            key={conv.id} 
+                            onClick={() => navigate("/messages", { state: { initialConversationId: conv.id } })}
+                            className="flex items-center justify-between rounded-2xl border bg-white p-4 shadow-sm cursor-pointer hover:bg-emerald-50/50 transition-colors"
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="h-10 w-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold">
+                                {conv.contractor.username[0].toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="text-sm font-bold text-emerald-900">{conv.project.title}</p>
+                                <p className="text-xs text-slate-500">Contractor: {conv.contractor.username}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[10px] text-slate-400 font-medium">
+                                {new Date(conv.updated_at).toLocaleDateString()}
+                              </p>
+                              <span className="inline-flex items-center mt-1 text-[10px] font-bold text-emerald-600 uppercase tracking-tighter">
+                                Open Chat →
+                              </span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8 rounded-2xl border-2 border-dashed border-slate-100">
+                          <p className="text-slate-400 text-sm italic">No recent messages.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   {/* edit log modal */}
                   {editLogModalOpen && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
@@ -922,7 +1001,27 @@ export default function WorkerDashboard() {
                   <p className="mt-1 text-sm text-slate-600">Manage your professional information and availability.</p>
 
                   <div className="mt-8 max-w-2xl rounded-2xl border bg-white p-6 shadow-sm">
-                    <form onSubmit={handleUpdateProfile} className="space-y-6">                      <div className="flex flex-col sm:flex-row gap-6 items-center bg-slate-50 p-6 rounded-2xl border border-dashed">
+                    <form onSubmit={handleUpdateProfile} className="space-y-6">                      <div className="flex flex-col sm:flex-row gap-6 items-center bg-slate-50 p-6 rounded-2xl border border-dashed relative group">
+                        <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-white shadow-sm border flex items-center justify-center font-black text-slate-300 text-3xl">
+                          {profile.profilePicture ? (
+                            <img 
+                              src={typeof profile.profilePicture === 'string' ? getImageUrl(profile.profilePicture) : URL.createObjectURL(profile.profilePicture)} 
+                              alt="Profile" 
+                              className="h-full w-full object-cover" 
+                            />
+                          ) : (
+                            <span>{profile.fullName?.[0]?.toUpperCase() || "?"}</span>
+                          )}
+                          <label className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+                            <span className="text-[10px] font-bold text-white uppercase tracking-wider">Change</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => setProfile({ ...profile, profilePicture: e.target.files[0] })}
+                            />
+                          </label>
+                        </div>
                         <div className="flex-1 space-y-1 text-center sm:text-left">
                           <h3 className="font-bold text-emerald-900">{profile.fullName || "Your Name"}</h3>
                           <p className="text-sm text-slate-500">{profile.specialization || "No specialization set"}</p>
@@ -1045,7 +1144,7 @@ export default function WorkerDashboard() {
                               <p className="text-slate-500 uppercase">{a.hiring_type}</p>
                             </div>
                             {a.status === "ACTIVE" && (
-                              <div className="mt-4 pt-4 border-t border-emerald-100">
+                              <div className="mt-4 pt-4 border-t border-emerald-100 flex gap-4">
                                 <button
                                   onClick={() => {
                                     setLogForm({ ...logForm, project: a.project });
@@ -1056,6 +1155,12 @@ export default function WorkerDashboard() {
                                   className="text-xs font-bold text-emerald-700 hover:underline"
                                 >
                                   Log Work for this Project →
+                                </button>
+                                <button
+                                  onClick={() => handleStartContractorChat(a.contractor, a.project)}
+                                  className="text-xs font-bold text-emerald-700 hover:underline"
+                                >
+                                  Chat with Contractor
                                 </button>
                               </div>
                             )}
@@ -1393,7 +1498,7 @@ export default function WorkerDashboard() {
                           </div>
                           {up.photo && (
                             <img
-                              src={up.photo}
+                              src={getImageUrl(up.photo)}
                               alt="Evidence"
                               className="w-full h-32 object-cover rounded-xl border cursor-pointer"
                               onClick={() => window.open(up.photo, '_blank')}

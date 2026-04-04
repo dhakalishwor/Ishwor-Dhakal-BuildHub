@@ -14,7 +14,7 @@ class ChatViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        return Conversation.objects.filter(Q(client=user) | Q(contractor=user))
+        return Conversation.objects.filter(Q(client=user) | Q(contractor=user) | Q(worker=user))
 
     @action(detail=False, methods=["post"], url_path="start")
     def start_conversation(self, request):
@@ -50,7 +50,59 @@ class ChatViewSet(viewsets.ModelViewSet):
         conversation, created = Conversation.objects.get_or_create(
             project=project,
             client=request.user,
-            contractor=contractor
+            contractor=contractor,
+            worker=None
+        )
+
+        serializer = self.get_serializer(conversation)
+        return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"], url_path="start-worker")
+    def start_worker_chat(self, request):
+        project_id = request.data.get("project_id")
+        worker_id = request.data.get("worker_id")
+
+        if not project_id or not worker_id:
+            return Response({"error": "project_id and worker_id are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            project_id = int(project_id)
+            worker_id = int(worker_id)
+        except (ValueError, TypeError):
+            return Response({"error": "Invalid project_id or worker_id format"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Ensure the requester is a contractor
+        if request.user.role != "contractor":
+            return Response({"error": "Only contractors can initiate chat with workers"}, status=status.HTTP_403_FORBIDDEN)
+
+        project = get_object_or_404(Project, id=project_id)
+        
+        # Ensure the contractor is assigned to this project
+        if project.assigned_contractor != request.user:
+             return Response({"error": "You are not assigned to this project"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Ensure the worker is hired for this project
+        from ProgressTracking.models import ProjectAssignment
+        has_assignment = ProjectAssignment.objects.filter(
+            project=project,
+            contractor=request.user,
+            worker_id=worker_id,
+            status="ACTIVE"
+        ).exists()
+
+        if not has_assignment:
+            return Response({"error": "This worker is not assigned to this project or assignment is not active"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Get the worker user object
+        from Authentication.models import User
+        worker = get_object_or_404(User, id=worker_id)
+
+        # Get or Create Conversation (Contractor-Worker chat has client=None)
+        conversation, created = Conversation.objects.get_or_create(
+            project=project,
+            client=None,
+            contractor=request.user,
+            worker=worker
         )
 
         serializer = self.get_serializer(conversation)

@@ -18,8 +18,9 @@ from .serializers import (
     ContractorLicenseUploadSerializer,
     AdminClientSerializer,
     ClientProfileSerializer,
+    AdminContractorLicenseSerializer,
 )
-from .ocr_verify import verify_contractor_license
+from verification.utils import verify_contractor_documents
 
 User = get_user_model()
 
@@ -66,8 +67,8 @@ class RoleBasedTokenObtainPairView(TokenObtainPairView):
 
 class ContractorLicenseUploadView(generics.CreateAPIView):
     """
-    Contractor uploads ONE license document after registration (no login required).
-    Frontend must send contractor_id + license_document.
+    Contractor uploads license and citizenship document after registration (no login required).
+    Frontend must send contractor_id + license_document + citizenship_document.
 
     If uploaded again → overwrite/update.
     Includes OCR verification after upload.
@@ -104,27 +105,26 @@ class ContractorLicenseUploadView(generics.CreateAPIView):
 
         license_obj, _ = ContractorLicense.objects.update_or_create(
             contractor=contractor,
-            defaults={"license_document": serializer.validated_data["license_document"]},
+            defaults={
+                "license_document": serializer.validated_data["license_document"],
+                "citizenship_document": serializer.validated_data["citizenship_document"],
+            },
         )
 
-        # Perform OCR verification (gracefully handle missing Tesseract)
         file_path = license_obj.license_document.path
         poppler_path = getattr(settings, "POPPLER_PATH", None)
-        
-        # Use first_name + last_name if available, otherwise fallback to username
+
         first_name = getattr(contractor, "first_name", "").strip()
         last_name = getattr(contractor, "last_name", "").strip()
-        
+
         if first_name and last_name:
             registered_name = f"{first_name} {last_name}"
         elif first_name:
             registered_name = first_name
         else:
-            # Fallback to username, but try to convert common username formats
             username = getattr(contractor, "username", "").strip()
-            # Try to convert "john_doe" or "john-doe" to "John Doe"
             if "_" in username or "-" in username:
-                parts = re.split(r"[_\-]", username)    
+                parts = re.split(r"[_\-]", username)
                 if len(parts) >= 2:
                     registered_name = " ".join(p.capitalize() for p in parts[:2])
                 else:
@@ -133,60 +133,61 @@ class ContractorLicenseUploadView(generics.CreateAPIView):
                 registered_name = username
 
         try:
-            result_status, score, extracted_or_reason = verify_contractor_license(
-                file_path=file_path,
-                registered_name=registered_name,
-                threshold=90.0,  # Stricter threshold
-                poppler_path=poppler_path
-            )
+            # We need the absolute paths of both documents
+            file_paths = [
+                license_obj.license_document.path,
+                license_obj.citizenship_document.path
+            ]
+            
+            print(f"Starting verification for contractor {contractor_id}")
+            result = verify_contractor_documents(file_paths)
+            print(f"Verification result: {result.get('message')}")
 
-            license_obj.match_score = score
+            license_obj.match_score = result.get("confidence_score", 0)
+            best_match = result.get("best_match", ("", ""))
+            license_obj.extracted_name = f"{best_match[0]}, {best_match[1]}" if best_match[0] else ""
 
-            if result_status == "VERIFIED":
+            if result.get("verified"):
                 license_obj.status = ContractorLicense.STATUS_VERIFIED
-                license_obj.extracted_name = extracted_or_reason
                 license_obj.rejection_reason = ""
-            elif result_status == "UNDER_REVIEW":
-                license_obj.status = ContractorLicense.STATUS_UNDER_REVIEW
-                license_obj.extracted_name = extracted_or_reason if score > 0 else ""
-                license_obj.rejection_reason = (
-                    extracted_or_reason if score == 0 else "Low confidence / partial mismatch."
+                license_obj.save()
+                return Response(
+                    {
+                        "message": "Documents verified successfully. You can now login.",
+                        "status": license_obj.status,
+                        "redirect": "/login",
+                        "details": result
+                    },
+                    status=status.HTTP_201_CREATED
                 )
             else:
                 license_obj.status = ContractorLicense.STATUS_REJECTED
-                license_obj.extracted_name = extracted_or_reason
-                license_obj.rejection_reason = "Name on license does not match registration details."
-        except pytesseract.TesseractNotFoundError:
-            # Tesseract OCR not installed - set to manual review
-            license_obj.status = ContractorLicense.STATUS_UNDER_REVIEW
-            license_obj.match_score = None
-            license_obj.extracted_name = ""
-            license_obj.rejection_reason = "OCR verification unavailable. Document requires manual review."
+                license_obj.rejection_reason = result.get("message", "Verification failed.")
+                license_obj.save()
+                return Response(
+                    {
+                        "error": result.get("message"),
+                        "status": license_obj.status,
+                        "details": result
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
         except Exception as e:
-            # Other OCR errors - still allow upload but mark for review
+            print(f"Unexpected error in verification: {e}")
             license_obj.status = ContractorLicense.STATUS_UNDER_REVIEW
-            license_obj.match_score = None
-            license_obj.extracted_name = ""
-            license_obj.rejection_reason = f"OCR verification failed: {str(e)}. Document requires manual review."
+            license_obj.rejection_reason = f"Verification system error: {str(e)}"
+            license_obj.save()
+            return Response(
+                {"error": f"An error occurred during verification: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
-        license_obj.save()
-
-        return Response(
-            {
-                "message": "License uploaded successfully.",
-                "status": license_obj.status,
-                "registered_name": registered_name,
-                "extracted_name": license_obj.extracted_name,
-                "match_score": license_obj.match_score,
-                "rejection_reason": license_obj.rejection_reason,
-            },
-            status=status.HTTP_201_CREATED
-        )
 
 
 class ContractorLicenseUpdateView(APIView):
     """
-    Authenticated contractor can update/re-upload their license.
+    Authenticated contractor can update/re-upload their license and citizenship document.
     Requires authentication.
     """
     permission_classes = [IsAuthenticated]
@@ -214,18 +215,15 @@ class ContractorLicenseUpdateView(APIView):
         file_path = license_obj.license_document.path
         poppler_path = getattr(settings, "POPPLER_PATH", None)
 
-        # Use first_name + last_name if available, otherwise fallback to username
         first_name = getattr(user, "first_name", "").strip()
         last_name = getattr(user, "last_name", "").strip()
-        
+
         if first_name and last_name:
             registered_name = f"{first_name} {last_name}"
         elif first_name:
             registered_name = first_name
         else:
-            # Fallback to username, but try to convert common username formats
             username = getattr(user, "username", "").strip()
-            # Try to convert "john_doe" or "john-doe" to "John Doe"
             if "_" in username or "-" in username:
                 parts = re.split(r"[_\-]", username)
                 if len(parts) >= 2:
@@ -239,7 +237,7 @@ class ContractorLicenseUpdateView(APIView):
             result_status, score, extracted_or_reason = verify_contractor_license(
                 file_path=file_path,
                 registered_name=registered_name,
-                threshold=90.0,  # Stricter threshold
+                threshold=90.0,
                 poppler_path=poppler_path
             )
 
@@ -260,13 +258,11 @@ class ContractorLicenseUpdateView(APIView):
                 license_obj.extracted_name = extracted_or_reason
                 license_obj.rejection_reason = "Name on license does not match registration details."
         except pytesseract.TesseractNotFoundError:
-            # Tesseract OCR not installed - set to manual review
             license_obj.status = ContractorLicense.STATUS_UNDER_REVIEW
             license_obj.match_score = None
             license_obj.extracted_name = ""
             license_obj.rejection_reason = "OCR verification unavailable. Document requires manual review."
         except Exception as e:
-            # Other OCR errors - still allow upload but mark for review
             license_obj.status = ContractorLicense.STATUS_UNDER_REVIEW
             license_obj.match_score = None
             license_obj.extracted_name = ""
@@ -291,7 +287,7 @@ class AdminLicenseListView(generics.ListAPIView):
     Admin can see all uploaded licenses.
     """
     queryset = ContractorLicense.objects.all().order_by("-updated_at")
-    serializer_class = ContractorLicenseUploadSerializer 
+    serializer_class = AdminContractorLicenseSerializer
     permission_classes = [IsAuthenticated, IsAdminRole]
 
 
@@ -317,7 +313,7 @@ class AdminLicenseReviewView(APIView):
             license_obj.rejection_reason = reason
         else:
             license_obj.rejection_reason = ""
-            
+
         license_obj.save()
         return Response({"detail": f"License marked as {new_status}."})
 
@@ -343,6 +339,7 @@ class AdminClientDetailView(generics.RetrieveUpdateDestroyAPIView):
 class ClientProfileViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = ClientProfileSerializer
+    parser_classes = [MultiPartParser, FormParser]
 
     def get_queryset(self):
         return ClientProfile.objects.filter(user=self.request.user)

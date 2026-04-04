@@ -1,4 +1,5 @@
 from rest_framework import viewsets, status
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -18,6 +19,8 @@ class ContractorViewSet(viewsets.ModelViewSet):
     queryset = Contractor.objects.all()
     serializer_class = ContractorSerializer
     permission_classes = [IsAuthenticated, IsContractorOwner]
+    lookup_field = "user_id"
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     @action(detail=False, methods=["get", "put", "patch"], url_path="me")
     def me(self, request):
@@ -57,7 +60,7 @@ class ContractorViewSet(viewsets.ModelViewSet):
 
             if request.method == "GET":
                 try:
-                    serializer = ContractorSerializer(contractor)
+                    serializer = ContractorSerializer(contractor, context={"request": request})
                     return Response(serializer.data)
                 except Exception as e:
                     import traceback
@@ -72,6 +75,7 @@ class ContractorViewSet(viewsets.ModelViewSet):
                 contractor,
                 data=request.data,
                 partial=(request.method == "PATCH"),
+                context={"request": request},
             )
             serializer.is_valid(raise_exception=True)
             serializer.save()
@@ -100,14 +104,19 @@ class WorkerViewSet(viewsets.ModelViewSet):
         )
         
         if request.method == "GET":
-            return Response(WorkerProfileSerializer(profile).data)
+            return Response(WorkerProfileSerializer(profile, context={"request": request}).data)
         
-        serializer = WorkerProfileSerializer(profile, data=request.data, partial=(request.method == "PATCH"))
+        serializer = WorkerProfileSerializer(
+            profile, 
+            data=request.data, 
+            partial=(request.method == "PATCH"),
+            context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
 
-    @action(detail=True, methods=["post"], url_path="hire")
+    @action(detail=True, methods=["post"], url_path="hire", parser_classes=[JSONParser, MultiPartParser, FormParser])
     def hire(self, request, pk=None):
         worker_profile = self.get_object()
         contractor = request.user

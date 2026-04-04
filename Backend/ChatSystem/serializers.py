@@ -24,12 +24,13 @@ class MessageSerializer(serializers.ModelSerializer):
 class ConversationSerializer(serializers.ModelSerializer):
     client = UserSerializer(read_only=True)
     contractor = UserSerializer(read_only=True)
+    worker = UserSerializer(read_only=True)
     project = ProjectSerializer(read_only=True)
     last_message = serializers.SerializerMethodField()
 
     class Meta:
         model = Conversation
-        fields = ["id", "project", "client", "contractor", "created_at", "last_message"]
+        fields = ["id", "project", "client", "contractor", "worker", "created_at", "last_message"]
 
     def get_last_message(self, obj):
         last_msg = obj.messages.order_by("-created_at").first()

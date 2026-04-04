@@ -10,21 +10,31 @@ class Conversation(models.Model):
     client = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
         on_delete=models.CASCADE, 
-        related_name="client_conversations"
+        related_name="client_conversations",
+        null=True,
+        blank=True
     )
     contractor = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
         on_delete=models.CASCADE, 
         related_name="contractor_conversations"
     )
+    worker = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name="worker_conversations",
+        null=True,
+        blank=True
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ("project", "client", "contractor")
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"Chat: {self.project.title} ({self.client.username} & {self.contractor.username})"
+        if self.worker:
+            return f"Chat: {self.project.title} (Contractor {self.contractor.username} & Worker {self.worker.username})"
+        return f"Chat: {self.project.title} (Client {self.client.username} & Contractor {self.contractor.username})"
 
 class Message(models.Model):
     conversation = models.ForeignKey(

@@ -201,6 +201,12 @@ export default function ProjectBids({ onChatStarted, embedded = false }) {
 
                   <div className="flex gap-2 mb-2">
                     <button
+                      onClick={() => navigate(`/contractor-profile/${bid.contractor}`)}
+                      className="flex-1 px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 font-semibold text-sm transition-all"
+                    >
+                      View Profile
+                    </button>
+                    <button
                       onClick={() => startConversation(selectedProject, bid.contractor)}
                       className="flex-1 px-3 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 font-semibold text-sm"
                     >

@@ -4,6 +4,7 @@ import { toast } from "react-hot-toast";
 
 export default function RateProject({ projectId, onSuccess, onCancel }) {
   const [rating, setRating] = useState(5);
+  const [hoverRating, setHoverRating] = useState(0);
   const [feedback, setFeedback] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -36,18 +37,36 @@ export default function RateProject({ projectId, onSuccess, onCancel }) {
 
       <form onSubmit={submit} className="mt-3 space-y-3">
         <div>
-          <label className="text-sm font-medium text-slate-700">Rating</label>
-          <select
-            value={rating}
-            onChange={(e) => setRating(e.target.value)}
-            className="mt-1 w-full rounded-xl border px-3 py-2"
-          >
-            {[5, 4, 3, 2, 1].map((n) => (
-              <option key={n} value={n}>
-                {n} Star{n > 1 ? "s" : ""}
-              </option>
+          <label className="text-sm font-medium text-slate-700 block mb-1">Rating</label>
+          <div className="flex gap-1 py-1">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                type="button"
+                onClick={() => setRating(star)}
+                onMouseEnter={() => setHoverRating(star)}
+                onMouseLeave={() => setHoverRating(0)}
+                className="focus:outline-none transition-transform hover:scale-110"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill={(hoverRating || rating) >= star ? "currentColor" : "none"}
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`w-8 h-8 ${
+                    (hoverRating || rating) >= star
+                      ? "text-amber-400"
+                      : "text-slate-300"
+                  } transition-colors duration-200`}
+                >
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
+              </button>
             ))}
-          </select>
+          </div>
         </div>
 
         <div>

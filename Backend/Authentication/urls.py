@@ -11,6 +11,7 @@ from .views import (
     AdminClientDetailView,
     ClientProfileViewSet,
 )
+from .admin_views import AdminDashboardStatsView
 from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
@@ -31,4 +32,5 @@ urlpatterns = [
     # Admin client management
     path('admin/clients/', AdminClientListCreateView.as_view(), name='admin_client_list_create'),
     path('admin/clients/<int:pk>/', AdminClientDetailView.as_view(), name='admin_client_detail'),
+    path('admin/stats/', AdminDashboardStatsView.as_view(), name='admin_stats'),
 ]

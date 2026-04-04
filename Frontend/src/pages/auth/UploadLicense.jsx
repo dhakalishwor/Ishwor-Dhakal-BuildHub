@@ -6,6 +6,7 @@ const UploadLicense = () => {
   const navigate = useNavigate();
 
   const [licenseFile, setLicenseFile] = useState(null);
+  const [citizenshipFile, setCitizenshipFile] = useState(null);
   const [contractorId, setContractorId] = useState(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -26,6 +27,12 @@ const UploadLicense = () => {
     setLicenseFile(e.target.files[0]);
   };
 
+  const handleCitizenshipChange = (e) => {
+    setError("");
+    setSuccess("");
+    setCitizenshipFile(e.target.files[0]);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -41,9 +48,15 @@ const UploadLicense = () => {
       return;
     }
 
+    if (!citizenshipFile) {
+      setError("Please select a citizenship document to upload.");
+      return;
+    }
+
     const formData = new FormData();
     formData.append("contractor_id", contractorId); // REQUIRED
     formData.append("license_document", licenseFile);
+    formData.append("citizenship_document", citizenshipFile);
 
     setLoading(true);
 
@@ -54,7 +67,7 @@ const UploadLicense = () => {
         },
       });
 
-      setSuccess("License uploaded successfully. Please login to continue.");
+      setSuccess("License and citizenship uploaded successfully. Please login to continue.");
 
       // cleanup temporary ID
       localStorage.removeItem("pendingContractorId");
@@ -65,7 +78,7 @@ const UploadLicense = () => {
     } catch (err) {
       const msg =
         err?.response?.data?.detail ||
-        "Failed to upload license. Please try again.";
+        "Failed to upload documents. Please try again.";
       setError(msg);
     } finally {
       setLoading(false);
@@ -93,7 +106,6 @@ const UploadLicense = () => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* File Upload */}
           <div>
             <label className="block text-gray-700 mb-1">
               Contractor License
@@ -109,7 +121,21 @@ const UploadLicense = () => {
             </p>
           </div>
 
-          {/* Upload Button */}
+          <div>
+            <label className="block text-gray-700 mb-1">
+              Contractor Citizenship
+            </label>
+            <input
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={handleCitizenshipChange}
+              className="w-full px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Accepted formats: PDF, JPG, PNG
+            </p>
+          </div>
+
           <button
             type="submit"
             disabled={loading}
@@ -119,7 +145,6 @@ const UploadLicense = () => {
           </button>
         </form>
 
-        {/* Back to Login */}
         <p className="text-sm text-center text-gray-600 mt-4">
           Already uploaded?{" "}
           <span

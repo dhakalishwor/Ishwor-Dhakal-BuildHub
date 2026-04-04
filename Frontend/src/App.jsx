@@ -17,6 +17,7 @@ import WorkerDashboard from "./pages/dashboard/WorkerDashboard";
 import MessagesPage from "./pages/message/MessagesPage";
 import ReportIssue from "./pages/support/ReportIssue";
 import MyIssues from "./pages/support/MyIssues";
+import ContractorProfile from "./pages/client/ContractorProfile";
 
 import { Toaster } from "react-hot-toast";
 
@@ -43,6 +44,7 @@ function App() {
         <Route path="/messages" element={<MessagesPage />} />
         <Route path="/support/report" element={<ReportIssue />} />
         <Route path="/support/my-issues" element={<MyIssues />} />
+        <Route path="/contractor-profile/:id" element={<ContractorProfile />} />
         <Route path="/projects/:id" element={<Navigate to="/" replace />} />
         <Route path="/projects/:id/progress" element={<Navigate to="/" replace />} />
       </Routes>

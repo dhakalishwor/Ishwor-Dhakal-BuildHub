@@ -45,7 +45,6 @@ export default function AdminIssueManagement() {
     }, [filters.status, filters.priority, filters.type]);
 
     useEffect(() => {
-        // Auto-select issue if provided via URL and present in list
         if (highlightIssueId && issues.length > 0 && !selectedIssue) {
             const targetIssue = issues.find(i => i.id.toString() === highlightIssueId);
             if (targetIssue) {
@@ -73,35 +72,35 @@ export default function AdminIssueManagement() {
         setUpdating(true);
         try {
             await api.patch(`/api/admin/reports/${selectedIssue.id}/`, updateForm);
-            toast.success("Issue updated successfully");
+            toast.success("Issue state synchronized");
             fetchIssues();
             setSelectedIssue(prev => ({ ...prev, ...updateForm }));
         } catch (err) {
             console.error(err);
-            toast.error("Failed to update issue");
+            toast.error("Failed to update ticket status");
         } finally {
             setUpdating(false);
         }
     };
 
     const getStatusBadge = (status) => {
-        const base = "px-2.5 py-1 rounded-full text-xs font-bold uppercase ";
+        const base = "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ";
         switch (status) {
-            case "OPEN": return <span className={base + "bg-blue-100 text-blue-700"}>Open</span>;
-            case "IN_PROGRESS": return <span className={base + "bg-yellow-100 text-yellow-700"}>In Progress</span>;
-            case "RESOLVED": return <span className={base + "bg-green-100 text-green-700"}>Resolved</span>;
-            case "REJECTED": return <span className={base + "bg-red-100 text-red-700"}>Rejected</span>;
-            default: return <span className={base + "bg-gray-100 text-gray-700"}>{status}</span>;
+            case "OPEN": return <span className={base + "bg-blue-50 text-blue-600 border border-blue-100"}>Open</span>;
+            case "IN_PROGRESS": return <span className={base + "bg-orange-50 text-orange-600 border border-orange-100"}>In Progress</span>;
+            case "RESOLVED": return <span className={base + "bg-emerald-50 text-emerald-600 border border-emerald-100"}>Resolved</span>;
+            case "REJECTED": return <span className={base + "bg-red-50 text-red-600 border border-red-100"}>Rejected</span>;
+            default: return <span className={base + "bg-slate-50 text-slate-600 border border-slate-100"}>{status}</span>;
         }
     };
 
     const getPriorityBadge = (priority) => {
-        const base = "px-2 py-0.5 rounded text-[10px] font-bold uppercase ";
+        const base = "px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter ";
         switch (priority) {
-            case "HIGH": return <span className={base + "bg-red-500 text-white"}>High</span>;
+            case "HIGH": return <span className={base + "bg-red-500 text-white"}>High Priority</span>;
             case "MEDIUM": return <span className={base + "bg-orange-400 text-white"}>Medium</span>;
             case "LOW": return <span className={base + "bg-emerald-500 text-white"}>Low</span>;
-            default: return <span className={base + "bg-gray-400 text-white"}>{priority}</span>;
+            default: return <span className={base + "bg-slate-400 text-white"}>{priority}</span>;
         }
     };
 
@@ -113,60 +112,42 @@ export default function AdminIssueManagement() {
     };
 
     return (
-        <div className="p-6">
-            <h1 className="text-2xl font-bold text-emerald-900 mb-6">Issue Management</h1>
-
-            {/* Analytics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div className="bg-white p-4 rounded-2xl border shadow-sm">
-                    <p className="text-xs font-bold text-gray-400 uppercase">Open Issues</p>
-                    <p className="text-3xl font-bold text-blue-600 mt-1">{stats.open}</p>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border shadow-sm">
-                    <p className="text-xs font-bold text-gray-400 uppercase">In Progress</p>
-                    <p className="text-3xl font-bold text-yellow-600 mt-1">{stats.inProgress}</p>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border shadow-sm">
-                    <p className="text-xs font-bold text-gray-400 uppercase">Resolved</p>
-                    <p className="text-3xl font-bold text-green-600 mt-1">{stats.resolved}</p>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border shadow-sm">
-                    <p className="text-xs font-bold text-gray-400 uppercase">High Priority Pending</p>
-                    <p className="text-3xl font-bold text-red-600 mt-1">{stats.highPending}</p>
-                </div>
+        <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div>
+                <h1 className="text-2xl font-black text-slate-900 tracking-tight">Issue Management</h1>
+                <p className="text-slate-500 text-sm">Review platform reports, handle disputes, and maintain community standards.</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* List View */}
+            {/* Analytics Ledger */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <StatBox label="Open Tickets" value={stats.open} color="blue" />
+                <StatBox label="Under Review" value={stats.inProgress} color="orange" />
+                <StatBox label="Resolved" value={stats.resolved} color="emerald" />
+                <StatBox label="Critical Fixes" value={stats.highPending} color="red" />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* List Architecture */}
                 <div className="lg:col-span-2">
-                    <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
-                        <div className="p-4 border-b bg-gray-50/50 flex flex-wrap gap-3 items-center">
+                    <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden">
+                        <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex flex-wrap gap-4 items-center">
                             <select
-                                className="text-sm rounded-xl border-gray-300"
+                                className="text-[10px] font-black uppercase tracking-widest rounded-xl border-slate-200 focus:ring-emerald-500 py-2.5"
                                 value={filters.status}
                                 onChange={e => setFilters(prev => ({ ...prev, status: e.target.value }))}
                             >
-                                <option value="ALL">All Status</option>
+                                <option value="ALL">All States</option>
                                 <option value="OPEN">Open</option>
-                                <option value="IN_PROGRESS">In Progress</option>
+                                <option value="IN_PROGRESS">Processing</option>
                                 <option value="RESOLVED">Resolved</option>
                                 <option value="REJECTED">Rejected</option>
                             </select>
-                            <select
-                                className="text-sm rounded-xl border-gray-300"
-                                value={filters.priority}
-                                onChange={e => setFilters(prev => ({ ...prev, priority: e.target.value }))}
-                            >
-                                <option value="">All Priority</option>
-                                <option value="LOW">Low</option>
-                                <option value="MEDIUM">Medium</option>
-                                <option value="HIGH">High</option>
-                            </select>
-                            <form onSubmit={handleSearch} className="flex-1 min-w-[200px]">
+                            <form onSubmit={handleSearch} className="flex-1 min-w-[200px] relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 opacity-20">🔍</span>
                                 <input
                                     type="text"
-                                    placeholder="Search by ID, title, user..."
-                                    className="w-full text-sm rounded-xl border-gray-300 focus:ring-emerald-500"
+                                    placeholder="Filter system logs..."
+                                    className="w-full text-xs font-bold rounded-xl border-slate-200 pl-10 focus:ring-emerald-500 py-2.5"
                                     value={filters.search}
                                     onChange={e => setFilters(prev => ({ ...prev, search: e.target.value }))}
                                 />
@@ -175,38 +156,40 @@ export default function AdminIssueManagement() {
 
                         <div className="overflow-x-auto">
                             <table className="w-full text-left">
-                                <thead className="bg-gray-50 border-b">
+                                <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">
                                     <tr>
-                                        <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Ticket</th>
-                                        <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Info</th>
-                                        <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Status</th>
-                                        <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Action</th>
+                                        <th className="px-6 py-4">Ticket ID</th>
+                                        <th className="px-6 py-4">Subject & Context</th>
+                                        <th className="px-6 py-4">Current Status</th>
+                                        <th className="px-6 py-4 text-right">View</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y">
+                                <tbody className="divide-y divide-slate-50">
                                     {loading ? (
-                                        <tr><td colSpan="4" className="p-10 text-center text-gray-400">Loading...</td></tr>
+                                        <tr><td colSpan="4" className="p-20 text-center text-slate-300 font-bold uppercase tracking-widest text-[10px] italic">Syncing stream...</td></tr>
                                     ) : issues.map(issue => (
                                         <tr
                                             key={issue.id}
-                                            className={`hover:bg-gray-50 cursor-pointer transition ${selectedIssue?.id === issue.id ? "bg-emerald-50" : ""}`}
+                                            className={`hover:bg-slate-50/50 cursor-pointer transition-all duration-300 group ${selectedIssue?.id === issue.id ? "bg-emerald-50/50" : ""}`}
                                             onClick={() => handleSelectIssue(issue)}
                                         >
-                                            <td className="px-4 py-4 text-sm font-medium text-gray-400">#{issue.id}</td>
-                                            <td className="px-4 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-bold text-gray-800 text-sm">{issue.title}</span>
+                                            <td className="px-6 py-6 text-xs font-black text-slate-300">#{issue.id}</td>
+                                            <td className="px-6 py-6">
+                                                <div className="flex items-center gap-3 mb-1">
+                                                    <span className="font-bold text-slate-800 text-sm group-hover:text-emerald-700 transition-colors">{issue.title}</span>
                                                     {getPriorityBadge(issue.priority)}
                                                 </div>
-                                                <div className="text-xs text-gray-500 mt-1">
-                                                    By <span className="text-emerald-700 font-medium">{issue.reporter_username}</span> • {issue.report_type}
+                                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                                                    Reporter: <span className="text-slate-600 font-black">@{issue.reporter_username}</span> • {issue.report_type}
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-4">
+                                            <td className="px-6 py-6">
                                                 {getStatusBadge(issue.status)}
                                             </td>
-                                            <td className="px-4 py-4">
-                                                <button className="text-emerald-600 text-xs font-bold hover:underline">View</button>
+                                            <td className="px-6 py-6 text-right">
+                                                <div className="h-8 w-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-hover:text-emerald-600 group-hover:border-emerald-200 transition-all shadow-sm">
+                                                    →
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -216,59 +199,54 @@ export default function AdminIssueManagement() {
                     </div>
                 </div>
 
-                {/* Detail/Update View */}
+                {/* Conflict Detail Terminal */}
                 <div className="lg:col-span-1">
                     {selectedIssue ? (
-                        <div className="bg-white rounded-2xl border shadow-sm p-6 sticky top-24">
-                            <h2 className="text-lg font-bold text-gray-800 mb-4">Issue Details</h2>
+                        <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl shadow-slate-200/50 p-8 sticky top-28 animate-in slide-in-from-right-4 duration-500">
+                            <h2 className="text-lg font-black text-slate-900 mb-6">Execution Panel</h2>
 
-                            <div className="space-y-4 mb-6">
+                            <div className="space-y-6 mb-8">
                                 <div>
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Reporter Info</p>
-                                    <p className="text-sm font-semibold text-gray-700 mt-0.5">{selectedIssue.reporter_username}</p>
-                                    <p className="text-xs text-gray-500">ID: {selectedIssue.reporter}</p>
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Description</p>
-                                    <p className="text-sm text-gray-600 mt-1 leading-relaxed bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                        {selectedIssue.description}
-                                    </p>
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Claim Summary</p>
+                                    <div className="bg-slate-50/80 p-5 rounded-[1.5rem] border border-slate-100 italic text-[13px] leading-relaxed text-slate-600 border-l-4 border-l-emerald-500">
+                                        "{selectedIssue.description}"
+                                    </div>
                                 </div>
                                 {selectedIssue.attachment && (
                                     <div>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Attachment</p>
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Evidence Files</p>
                                         <a
                                             href={selectedIssue.attachment}
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="inline-flex items-center gap-2 text-xs font-bold text-emerald-600 mt-1 hover:underline bg-emerald-50 px-3 py-1.5 rounded-lg"
+                                            className="inline-flex items-center gap-3 text-[10px] font-black text-emerald-700 hover:text-white hover:bg-emerald-700 bg-emerald-50 px-5 py-2.5 rounded-xl transition-all shadow-sm shadow-emerald-700/10 uppercase tracking-widest"
                                         >
-                                            View Attachment
+                                            Inspect Documents
                                         </a>
                                     </div>
                                 )}
                             </div>
 
-                            <form onSubmit={handleUpdateIssue} className="border-t pt-6 space-y-4">
+                            <form onSubmit={handleUpdateIssue} className="border-t border-slate-100 pt-8 space-y-6">
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Update Status</label>
+                                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Resolution Protocol</label>
                                     <select
-                                        className="w-full rounded-xl border-gray-300 focus:ring-emerald-500"
+                                        className="w-full rounded-2xl border-slate-200 focus:ring-emerald-500 font-bold text-sm py-3.5 bg-slate-50/50"
                                         value={updateForm.status}
                                         onChange={e => setUpdateForm(prev => ({ ...prev, status: e.target.value }))}
                                     >
-                                        <option value="OPEN">Open</option>
-                                        <option value="IN_PROGRESS">In Progress</option>
-                                        <option value="RESOLVED">Resolved</option>
-                                        <option value="REJECTED">Rejected</option>
+                                        <option value="OPEN">Open Ticket</option>
+                                        <option value="IN_PROGRESS">Escalate / Process</option>
+                                        <option value="RESOLVED">Mark as Resolved</option>
+                                        <option value="REJECTED">Dismiss Claim</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Admin Response</label>
+                                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Internal Log / Admin Feedback</label>
                                     <textarea
-                                        rows={3}
-                                        className="w-full rounded-xl border-gray-300 focus:ring-emerald-500"
-                                        placeholder="Add a note or response to the user..."
+                                        rows={4}
+                                        className="w-full rounded-2xl border-slate-200 focus:ring-emerald-500 text-sm p-4 bg-slate-50/50"
+                                        placeholder="Add resolution details or confidential notes..."
                                         value={updateForm.admin_note}
                                         onChange={e => setUpdateForm(prev => ({ ...prev, admin_note: e.target.value }))}
                                     />
@@ -276,22 +254,38 @@ export default function AdminIssueManagement() {
                                 <button
                                     type="submit"
                                     disabled={updating}
-                                    className="w-full bg-emerald-700 text-white rounded-xl py-2.5 font-bold hover:bg-emerald-800 transition shadow-sm disabled:opacity-50"
+                                    className="w-full bg-emerald-950 text-white rounded-2xl py-4 font-black text-sm hover:bg-black transition-all shadow-xl shadow-emerald-950/20 active:scale-95 disabled:opacity-50 uppercase tracking-widest"
                                 >
-                                    {updating ? "Updating..." : "Save Update"}
+                                    {updating ? "Syncing..." : "Apply Resolution"}
                                 </button>
                             </form>
                         </div>
                     ) : (
-                        <div className="bg-gray-50 border-2 border-dashed rounded-2xl p-10 text-center flex flex-col items-center justify-center h-full min-h-[400px]">
-                            <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mb-4">
-                                <span className="text-gray-400 text-2xl font-bold">!</span>
+                        <div className="bg-slate-50/50 border-2 border-dashed border-slate-200 rounded-[2.5rem] p-12 text-center flex flex-col items-center justify-center h-full min-h-[400px] animate-pulse">
+                            <div className="h-20 w-20 bg-white rounded-[2rem] shadow-sm flex items-center justify-center mb-6 text-2xl grayscale opacity-40">
+                                📑
                             </div>
-                            <p className="text-gray-500 font-medium">Select an issue from the list to view details and take action.</p>
+                            <p className="text-slate-400 font-black uppercase tracking-widest text-[10px]">Awaiting Ticket Selection</p>
+                            <p className="text-slate-300 text-xs mt-2">Pick an issue from the registry to begin auditing.</p>
                         </div>
                     )}
                 </div>
             </div>
+        </div>
+    );
+}
+
+function StatBox({ label, value, color }) {
+    const colors = {
+        blue: "text-blue-600 bg-blue-50 border-blue-100 shadow-blue-600/5",
+        orange: "text-orange-600 bg-orange-50 border-orange-100 shadow-orange-600/5",
+        emerald: "text-emerald-600 bg-emerald-50 border-emerald-100 shadow-emerald-600/5",
+        red: "text-red-600 bg-red-50 border-red-100 shadow-red-600/5",
+    };
+    return (
+        <div className={`p-8 rounded-[2rem] border shadow-lg ${colors[color]} transition-transform hover:scale-105 duration-500`}>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-2">{label}</p>
+            <p className="text-4xl font-black text-slate-800">{value}</p>
         </div>
     );
 }

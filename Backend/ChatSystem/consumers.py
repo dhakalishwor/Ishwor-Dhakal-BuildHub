@@ -59,7 +59,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def is_user_in_conversation(self):
         try:
             conv = Conversation.objects.get(id=self.conversation_id)
-            return conv.client == self.user or conv.contractor == self.user
+            return conv.client == self.user or conv.contractor == self.user or conv.worker == self.user
         except Conversation.DoesNotExist:
             return False
 

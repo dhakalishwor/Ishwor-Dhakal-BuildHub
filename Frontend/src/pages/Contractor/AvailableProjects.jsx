@@ -3,6 +3,7 @@ import api from "../../API/axios";
 import DashboardLayout from "../../components/DashboardLayout";
 import SubmitBid from "./SubmitBid";
 import { useEffect, useState } from "react";
+import ProjectMap from "../../components/ProjectMap";
 
 export default function AvailableProjects({ embedded = false }) {
   const [projects, setProjects] = useState([]);
@@ -70,6 +71,14 @@ export default function AvailableProjects({ embedded = false }) {
                   {p.category} • {p.location}
                 </p>
                 <p className="text-sm mt-2">{p.description}</p>
+                
+                {p.latitude && p.longitude && (
+                  <div className="mt-4">
+                    <p className="text-xs font-bold text-emerald-900 uppercase mb-2">Location Map</p>
+                    <ProjectMap latitude={p.latitude} longitude={p.longitude} title={p.title} height="150px" />
+                  </div>
+                )}
+
                 <p className="text-sm font-semibold mt-2">Budget: {p.budget}</p>
                 <p className="text-xs text-gray-500 mt-1">Status: {p.status}</p>
               </div>

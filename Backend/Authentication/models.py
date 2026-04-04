@@ -41,8 +41,12 @@ class ContractorLicense(models.Model):
         limit_choices_to={"role": User.ROLE_CONTRACTOR},
     )
 
-   
     license_document = models.FileField(upload_to="contractor_licenses/")
+    citizenship_document = models.FileField(
+        upload_to="contractor_citizenships/",
+        null=True,
+        blank=True
+    )
 
     extracted_name = models.CharField(max_length=255, blank=True)
     match_score = models.FloatField(null=True, blank=True)
@@ -76,6 +80,7 @@ class ClientProfile(models.Model):
     phone = models.CharField(max_length=20, blank=True)
     address = models.CharField(max_length=255, blank=True)
     bio = models.TextField(blank=True)
+    profile_picture = models.ImageField(upload_to="client_profiles/", null=True, blank=True)
 
     def __str__(self):
         return f"{self.full_name} ({self.user.username})"

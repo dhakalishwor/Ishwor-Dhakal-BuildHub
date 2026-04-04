@@ -28,6 +28,11 @@ class Contractor(models.Model):
         (RATE_TYPE_PROJECT, "Project"),
     )
 
+    profile_picture = models.ImageField(
+        upload_to="contractor_profiles/",
+        null=True,
+        blank=True,
+    )
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -88,6 +93,11 @@ class WorkerProfile(models.Model):
         on_delete=models.CASCADE,
         related_name="worker_profile",
         limit_choices_to={"role": "worker"},
+    )
+    profile_picture = models.ImageField(
+        upload_to="worker_profiles/",
+        null=True,
+        blank=True,
     )
     full_name = models.CharField(max_length=255)
     skills = models.TextField(help_text="Comma-separated skills")

@@ -134,7 +134,16 @@ export default function ChatPanel({ initialConversation = null }) {
                         >
                             <p className="font-bold text-emerald-900 truncate uppercase">{c.project.title}</p>
                             <p className="text-slate-500 truncate mt-1">
-                                {c.client.username === myUsername ? `Contractor: ${c.contractor.username}` : `Client: ${c.client.username}`}
+                                {(() => {
+                                    if (c.worker) {
+                                        return c.worker.username === myUsername 
+                                            ? `Contractor: ${c.contractor.username}` 
+                                            : `Worker: ${c.worker.username}`;
+                                    }
+                                    return c.client?.username === myUsername 
+                                        ? `Contractor: ${c.contractor.username}` 
+                                        : `Client: ${c.client?.username || 'Unknown'}`;
+                                })()}
                             </p>
                         </button>
                     ))
@@ -156,9 +165,16 @@ export default function ChatPanel({ initialConversation = null }) {
                         {activeConv && (
                             <button
                                 onClick={() => {
-                                    const reportedUser = activeConv.client.username === myUsername
-                                        ? activeConv.contractor
-                                        : activeConv.client;
+                                    const reportedUser = (() => {
+                                        if (activeConv.worker) {
+                                            return activeConv.worker.username === myUsername 
+                                                ? activeConv.contractor 
+                                                : activeConv.worker;
+                                        }
+                                        return activeConv.client?.username === myUsername 
+                                            ? activeConv.contractor 
+                                            : activeConv.client;
+                                    })();
                                     navigate("/support/report", {
                                         state: {
                                             reported_user: reportedUser.id,

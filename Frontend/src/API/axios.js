@@ -5,12 +5,32 @@ const api = axios.create({
 });
 
 api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("accessToken");
+  async (config) => {
+    let token = localStorage.getItem("accessToken");
 
     config.headers = config.headers || {};
 
     if (token && token !== "null" && token !== "undefined") {
+      try {
+        // Pre-emptively refresh the token if it's expired or about to expire in the next 10 seconds
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const isExpiring = Math.floor(Date.now() / 1000) >= (payload.exp - 10);
+        
+        if (isExpiring) {
+          const refreshToken = localStorage.getItem("refreshToken");
+          if (refreshToken) {
+            const baseURL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+            const res = await axios.post(`${baseURL}/auth/token/refresh/`, {
+              refresh: refreshToken,
+            });
+            token = res.data.access;
+            localStorage.setItem("accessToken", token);
+          }
+        }
+      } catch (e) {
+        // If decoding or refresh fails, we will just pass the old token and let the response interceptor handle the 401
+      }
+      
       config.headers.Authorization = `Bearer ${token}`;
     } else {
       delete config.headers.Authorization;

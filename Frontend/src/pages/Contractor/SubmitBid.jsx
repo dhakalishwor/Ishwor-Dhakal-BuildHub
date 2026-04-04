@@ -24,7 +24,20 @@ export default function SubmitBid({ projectId, onSuccess }) {
       setMessage("");
       toast.success("Bid submitted!");
     } catch (err) {
-      toast.error(err?.response?.data?.detail || "Failed to submit bid");
+      const data = err?.response?.data;
+      let msg = "Failed to submit bid";
+      if (data) {
+        if (typeof data === "string") msg = data;
+        else if (data.detail) msg = data.detail;
+        else if (data.non_field_errors) msg = data.non_field_errors[0];
+        else {
+           // check first field error
+           const firstKey = Object.keys(data)[0];
+           if (Array.isArray(data[firstKey])) msg = data[firstKey][0];
+           else if (typeof data[firstKey] === "string") msg = data[firstKey];
+        }
+      }
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

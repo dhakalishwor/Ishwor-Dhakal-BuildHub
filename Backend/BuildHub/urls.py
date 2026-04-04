@@ -24,6 +24,7 @@ urlpatterns = [
     path("api/", include("IssueSystem.urls")),
     path("api/", include("ProgressTracking.urls")),
     path("api/", include("NotificationSystem.urls")),
+    path("api/verification/", include("verification.urls")),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
         "api/docs/swagger/",

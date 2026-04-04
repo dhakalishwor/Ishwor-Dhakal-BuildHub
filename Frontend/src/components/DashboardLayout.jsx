@@ -8,7 +8,7 @@ export default function DashboardLayout({ children, role, activeMenu }) {
     const HEADER_H = 64;
 
     const logoText = role === "admin" ? "BH Admin" : "BuildHub";
-    const subTitle = role === "client" ? "Client Dashboard" : role === "contractor" ? "Contractor Dashboard" : "Support Center";
+    const subTitle = role === "admin" ? "Admin Dashboard" : role === "client" ? "Client Dashboard" : role === "contractor" ? "Contractor Dashboard" : role === "worker" ? "Worker Dashboard" : "Support Center";
 
     return (
         <div className="min-h-screen bg-white text-slate-900">
@@ -56,7 +56,7 @@ export default function DashboardLayout({ children, role, activeMenu }) {
                             navigate("/support/my-issues");
                             return;
                         }
-                        const dashPath = role === "client" ? "/clientdashboard" : "/contractor";
+                        const dashPath = role === "admin" ? "/admin/dashboard" : role === "client" ? "/clientdashboard" : role === "worker" ? "/worker/dashboard" : "/contractor";
                         navigate(dashPath, { state: { activeMenu: key } });
                     }}
                 />

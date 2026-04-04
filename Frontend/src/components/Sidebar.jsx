@@ -37,8 +37,28 @@ export default function Sidebar({ role, activeMenu, onItemClick }) {
         { key: "my-issues", label: "My Issues", path: "/support/my-issues" },
     ];
 
-    const items = role === "client" ? clientItems : contractorItems;
-    const menuTitle = role === "client" ? "Client Menu" : "Contractor Menu";
+    const workerItems = [
+        { key: "dashboard", label: "Dashboard", path: "/worker/dashboard" },
+        { key: "myjobs", label: "My Jobs", path: "/worker/dashboard" },
+        { key: "mytasks", label: "My Tasks", path: "/worker/dashboard" },
+        { key: "project-progress", label: "Project Progress", path: "/worker/dashboard" },
+        { key: "subjobs", label: "Sub-Jobs", path: "/worker/dashboard" },
+        { key: "messages", label: "Messages", path: "/messages" },
+        { key: "payments", label: "Payments", path: "/worker/dashboard" },
+        { key: "profile", label: "Profile", path: "/worker/dashboard" },
+    ];
+
+    const adminItems = [
+        { key: "overview", label: "Dashboard", path: "/admin/dashboard" },
+        { key: "licenses", label: "License Review", path: "/admin/dashboard" },
+        { key: "contractors", label: "Contractor Mgt", path: "/admin/dashboard" },
+        { key: "clients", label: "Client Mgt", path: "/admin/dashboard" },
+        { key: "monitoring", label: "Project Monitoring", path: "/admin/dashboard" },
+        { key: "issues", label: "Resolution Center", path: "/admin/dashboard" },
+    ];
+
+    const items = role === "admin" ? adminItems : role === "client" ? clientItems : role === "worker" ? workerItems : contractorItems;
+    const menuTitle = role === "admin" ? "Admin Control" : role === "client" ? "Client Menu" : role === "worker" ? "Worker Menu" : "Contractor Menu";
 
     const handleItemClick = (item) => {
         if (onItemClick) {
@@ -87,7 +107,9 @@ export default function Sidebar({ role, activeMenu, onItemClick }) {
             <div className="mt-8 rounded-xl bg-white/10 p-4">
                 <p className="text-xs text-emerald-200">Tip</p>
                 <p className="mt-2 text-sm text-white/90">
-                    {role === "client"
+                    {role === "admin" 
+                        ? "Verify contractor licenses promptly to maintain platform integrity."
+                        : role === "client"
                         ? "Post clear project details to get better bids."
                         : "Keep your profile updated so clients can trust your work."}
                 </p>

@@ -8,6 +8,7 @@ import ContractorProjects from "../Contractor/ContractorProjects";
 import Sidebar from "../../components/Sidebar";
 import NotificationBell from "../../components/NotificationBell";
 import { confirmToast, promptToast } from "../../components/ConfirmToast";
+import getImageUrl from "../../utils/getImageUrl";
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(" ");
@@ -21,6 +22,7 @@ const emptyProfile = {
   experienceYears: "",
   avgRating: 0,
   totalRatings: 0,
+  profilePicture: null,
 };
 
 const allProjectTypes = ["Civil", "Electrical", "Plumbing", "Interior", "Painting", "Other"];
@@ -149,6 +151,7 @@ export default function ContractorDashboard() {
           typeof data.totalRatings === "number"
             ? data.totalRatings
             : Number(data.totalRatings || 0),
+        profilePicture: data.profilePicture || null,
       };
 
       setProfile(normalized);
@@ -214,6 +217,8 @@ export default function ContractorDashboard() {
         project_id: hiringForm.projectId,
         hiring_type: hiringForm.hiringType,
         rate: hiringForm.rate,
+      }, {
+        headers: { "Content-Type": "application/json" }
       });
       setSuccessMsg("Worker hired successfully!");
       setHiringForm({ workerId: null, projectId: "", rate: "", hiringType: "PER_DAY" });
@@ -426,6 +431,19 @@ export default function ContractorDashboard() {
     }
   }
 
+  async function handleStartWorkerChat(workerId, projectId) {
+    try {
+      const res = await api.post("/api/chat/start-worker/", {
+        project_id: projectId,
+        worker_id: workerId
+      });
+      navigate("/messages", { state: { initialConversationId: res.data.id } });
+    } catch (err) {
+      console.error(err);
+      setApiError(err?.response?.data?.error || "Failed to start chat.");
+    }
+  }
+
   function startEdit() {
     setSuccessMsg("");
     setApiError("");
@@ -479,26 +497,35 @@ export default function ContractorDashboard() {
 
     setSaving(true);
     try {
-      const payload = {
-        fullName: form.fullName.trim(),
-        email: form.email.trim() || null,
-        address: form.address.trim(),
-        projectTypes: form.projectTypes,
-        experienceYears: form.experienceYears === "" ? 0 : Number(form.experienceYears),
-      };
+      const formData = new FormData();
+      formData.append("fullName", form.fullName.trim());
+      if (form.email) formData.append("email", form.email.trim());
+      formData.append("address", form.address.trim());
+      formData.append("experienceYears", form.experienceYears === "" ? 0 : Number(form.experienceYears));
+      
+      // Handle projectTypes JSON
+      formData.append("projectTypes", JSON.stringify(form.projectTypes));
 
-      const res = await api.patch("/api/contractors/me/", payload);
+      const fileInput = document.getElementById("profile-pic-input");
+      if (fileInput && fileInput.files[0]) {
+        formData.append("profilePicture", fileInput.files[0]);
+      }
+
+      const res = await api.patch("/api/contractors/me/", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
       const data = res.data || {};
       const normalized = {
-        fullName: data.fullName || payload.fullName,
-        email: data.email || payload.email || "",
-        address: data.address || payload.address || "",
-        projectTypes: Array.isArray(data.projectTypes) ? data.projectTypes : payload.projectTypes,
+        fullName: data.fullName || form.fullName,
+        email: data.email || form.email || "",
+        address: data.address || form.address || "",
+        projectTypes: Array.isArray(data.projectTypes) ? data.projectTypes : form.projectTypes,
         experienceYears:
           data.experienceYears === 0 || data.experienceYears ? String(data.experienceYears) : "0",
         avgRating: typeof data.avgRating === "number" ? data.avgRating : profile.avgRating ?? 0,
         totalRatings: typeof data.totalRatings === "number" ? data.totalRatings : profile.totalRatings ?? 0,
+        profilePicture: data.profilePicture || null,
       };
 
       setProfile(normalized);
@@ -643,7 +670,24 @@ export default function ContractorDashboard() {
                     </div>
 
                     {!editing ? (
-                      <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-6">
+                        <div className="mb-6 flex items-center gap-6">
+                          <div className="h-24 w-24 rounded-2xl border-2 border-emerald-100 bg-emerald-50 overflow-hidden flex-shrink-0">
+                            {profile.profilePicture ? (
+                              <img src={getImageUrl(profile.profilePicture)} alt="Profile" className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="h-full w-full flex items-center justify-center text-3xl font-bold text-emerald-700 bg-emerald-50">
+                                {profile.fullName?.charAt(0) || "C"}
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-bold text-emerald-900">{profile.fullName}</h3>
+                            <p className="text-sm text-slate-500">{profile.email}</p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="rounded-xl border p-4">
                           <p className="text-xs text-slate-500">Full Name</p>
                           <p className="mt-1 font-semibold">{profile.fullName || "-"}</p>
@@ -683,8 +727,34 @@ export default function ContractorDashboard() {
                           </p>
                         </div>
                       </div>
+                      </div>
                     ) : (
                       <form onSubmit={saveProfile} className="p-6 space-y-4">
+                        <div className="mb-6 flex items-center gap-6">
+                          <div className="h-24 w-24 rounded-2xl border-2 border-dashed border-emerald-300 bg-emerald-50 overflow-hidden flex-shrink-0 flex items-center justify-center relative group">
+                            {profile.profilePicture ? (
+                              <img src={getImageUrl(profile.profilePicture)} alt="Profile" className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="text-3xl font-bold text-emerald-700">
+                                {profile.fullName?.charAt(0) || "C"}
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                              <span className="text-white text-xs font-bold">Change</span>
+                            </div>
+                          </div>
+                          <div className="flex-1">
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Profile Photo</label>
+                            <input
+                              type="file"
+                              id="profile-pic-input"
+                              accept="image/*"
+                              className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                            />
+                            <p className="mt-1 text-xs text-slate-400">JPG or PNG. Max 2MB.</p>
+                          </div>
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                             <label className="text-sm font-medium text-slate-700">Full Name</label>
@@ -774,6 +844,7 @@ export default function ContractorDashboard() {
                             </span>
                           </p>
                         </div>
+
 
                         <div className="flex justify-end gap-3 pt-2">
                           <button
@@ -1022,6 +1093,10 @@ export default function ContractorDashboard() {
                                     onClick={() => handleTerminateAssignment(a.id)}
                                     className="text-red-700 font-bold hover:underline"
                                   >Terminate</button>
+                                  <button
+                                    onClick={() => handleStartWorkerChat(a.worker, a.project)}
+                                    className="text-emerald-600 font-bold hover:underline"
+                                  >Chat</button>
                                 </>
                               )}
                               <button
@@ -1241,7 +1316,7 @@ export default function ContractorDashboard() {
                                       <div key={`task-up-${up.id}-${uIdx}`} className="min-w-[200px] bg-white p-3 rounded-lg border shadow-sm">
                                         {up.photo && (
                                           <img
-                                            src={up.photo}
+                                            src={getImageUrl(up.photo)}
                                             alt="Update"
                                             className="w-full h-24 object-cover rounded-md mb-2 cursor-pointer hover:opacity-80"
                                             onClick={() => window.open(up.photo, '_blank')}
@@ -1351,7 +1426,7 @@ export default function ContractorDashboard() {
                         {update.photo && (
                           <div className="mt-2">
                             <img 
-                              src={update.photo} 
+                              src={getImageUrl(update.photo)} 
                               alt="Task Update" 
                               className="max-w-xs h-auto rounded border"
                               onClick={() => window.open(update.photo, '_blank')}

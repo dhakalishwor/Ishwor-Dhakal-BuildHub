@@ -7,10 +7,11 @@ User = get_user_model()
 
 class ClientProfileSerializer(serializers.ModelSerializer):
     fullName = serializers.CharField(source='full_name')
+    profilePicture = serializers.ImageField(source='profile_picture', required=False)
 
     class Meta:
         model = ClientProfile
-        fields = ('fullName', 'phone', 'address', 'bio')
+        fields = ('fullName', 'phone', 'address', 'bio', 'profilePicture')
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -41,29 +42,68 @@ class RoleBasedTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
+        # super().validate handles credential verification (401 if fails)
         data = super().validate(attrs)
+        
+        user = self.user
+        license_status = "N/A"
+        
+        if user.role == User.ROLE_CONTRACTOR:
+            try:
+                license_obj = ContractorLicense.objects.get(contractor=user)
+                license_status = license_obj.status
+            except ContractorLicense.DoesNotExist:
+                license_status = "MISSING"
+
         # The frontend expects a 'user' object with id, username, email, role, and is_admin
         data['user'] = {
-            'id': self.user.id,
-            'username': self.user.username,
-            'email': self.user.email,
-            'role': self.user.role,
-            'is_admin': self.user.is_superuser or self.user.is_staff or self.user.role == 'admin'
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'role': user.role,
+            'license_status': license_status,
+            'is_admin': user.is_superuser or user.is_staff or user.role == 'admin'
         }
         return data
 
 class ContractorLicenseUploadSerializer(serializers.ModelSerializer):
     class Meta:
         model = ContractorLicense
-        fields = ('license_document',)
+        fields = ('license_document', 'citizenship_document')
+        extra_kwargs = {
+            'license_document': {'required': True},
+            'citizenship_document': {'required': True},
+        }
+
+
+class AdminContractorLicenseSerializer(serializers.ModelSerializer):
+    contractorUsername = serializers.CharField(source='contractor.username', read_only=True)
+    contractorEmail = serializers.EmailField(source='contractor.email', read_only=True)
+    
+    class Meta:
+        model = ContractorLicense
+        fields = '__all__'
 
 
 class AdminClientSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
+    profilePicture = serializers.SerializerMethodField()
+    dateJoined = serializers.DateTimeField(source='date_joined', read_only=True)
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'password', 'is_active')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'password', 'is_active', 'profilePicture', 'dateJoined')
+
+    def get_profilePicture(self, obj):
+        try:
+            if hasattr(obj, 'client_profile') and obj.client_profile.profile_picture:
+                request = self.context.get('request')
+                if request:
+                    return request.build_absolute_uri(obj.client_profile.profile_picture.url)
+                return obj.client_profile.profile_picture.url
+        except Exception:
+            pass
+        return None
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)

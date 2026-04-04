@@ -14,9 +14,12 @@ class BidCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Only contractors or workers can place bids.")
 
         project = attrs.get("project")
-
         if hasattr(project, "status") and project.status in ["CLOSED", "COMPLETED"]:
             raise serializers.ValidationError("This project is not open for bidding.")
+
+        # Check if user already bid
+        if Bid.objects.filter(project=project, contractor=user).exists():
+            raise serializers.ValidationError("You have already submitted a bid for this project.")
 
         return attrs
 
