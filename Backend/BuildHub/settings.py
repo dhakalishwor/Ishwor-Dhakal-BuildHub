@@ -4,6 +4,7 @@ Django settings for BuildHub project.
 
 from pathlib import Path
 import os
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -21,7 +22,6 @@ def env_list(name: str, default=None):
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-only-change-me")
 
-
 DEBUG = env_bool("DJANGO_DEBUG", True)
 
 APP_DOMAIN = os.environ.get("APP_DOMAIN")
@@ -37,9 +37,7 @@ for h in ("localhost", "127.0.0.1"):
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
 
-
 SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", False if DEBUG else True)
-
 SESSION_COOKIE_SECURE = env_bool("DJANGO_SESSION_COOKIE_SECURE", False if DEBUG else True)
 CSRF_COOKIE_SECURE = env_bool("DJANGO_CSRF_COOKIE_SECURE", False if DEBUG else True)
 
@@ -61,11 +59,9 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-
     "rest_framework",
     "rest_framework_simplejwt",
     "corsheaders",
-
     "Authentication",
     "RecommendationSystem",
     "ContractorManagement",
@@ -78,11 +74,10 @@ INSTALLED_APPS = [
     "IssueSystem",
     "ProgressTracking",
     "NotificationSystem",
-    'verification',
+    "verification",
 ]
 
 AUTH_USER_MODEL = "Authentication.User"
-
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
@@ -99,39 +94,23 @@ MIDDLEWARE = [
 ROOT_URLCONF = "BuildHub.urls"
 WSGI_APPLICATION = "BuildHub.wsgi.application"
 
-
-
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# if DATABASE_URL:
-#     import dj_database_url
-#     DATABASES = {
-#         "default": dj_database_url.parse(
-#             DATABASE_URL,
-#             conn_max_age=600,
-#             ssl_require=not DEBUG,
-#         )
-#     }
-# else:
-#     DATABASES = {
-#         "default": {
-#             "ENGINE": "django.db.backends.sqlite3",
-#             "NAME": BASE_DIR / "db.sqlite3",
-#         }
-#     }
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'BuildHub',
-        'USER': 'postgres',
-        'PASSWORD': '1234',
-        'HOST': 'localhost',
-        'PORT': '5432',
+if DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=False,
+        )
     }
-}
-
-
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -148,7 +127,6 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "API documentation for BuildHub",
     "VERSION": "1.0.0",
 }
-
 
 TEMPLATES = [
     {
@@ -172,7 +150,6 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = os.environ.get("DJANGO_TIME_ZONE", "UTC")
 USE_I18N = True
@@ -185,11 +162,9 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
-
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
 CORS_ALLOW_ALL_ORIGINS = env_bool("CORS_ALLOW_ALL_ORIGINS", True if DEBUG else False)
-
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", default=[FRONTEND_URL])
 CORS_ALLOW_CREDENTIALS = env_bool("CORS_ALLOW_CREDENTIALS", False)
 
@@ -197,8 +172,6 @@ CSRF_TRUSTED_ORIGINS = env_list(
     "CSRF_TRUSTED_ORIGINS",
     default=[FRONTEND_URL] if FRONTEND_URL.startswith("https://") else [],
 )
-
-
 
 ESEWA_PRODUCT_CODE = os.environ.get("ESEWA_PRODUCT_CODE", "EPAYTEST")
 ESEWA_SECRET_KEY = os.environ.get("ESEWA_SECRET_KEY", "8gBm/:&EnhH.1/q")
@@ -210,13 +183,10 @@ ESEWA_FORM_URL = os.environ.get(
 ESEWA_SUCCESS_URL = os.environ.get("ESEWA_SUCCESS_URL", f"{FRONTEND_URL}/payment/esewa/success")
 ESEWA_FAILURE_URL = os.environ.get("ESEWA_FAILURE_URL", f"{FRONTEND_URL}/payment/esewa/failure")
 
-
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 ASGI_APPLICATION = "BuildHub.asgi.application"
 
-# DEV (in-memory channel layer)
 CHANNEL_LAYERS = {
     "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
 }
-
