@@ -67,17 +67,20 @@ function RateProject({ projectId, onDone }) {
 
   return (
     <form onSubmit={submit} className="mt-3 space-y-2">
-      <select
-        value={rating}
-        onChange={(e) => setRating(Number(e.target.value))}
-        className="w-full rounded-lg border px-3 py-2 text-sm"
-      >
-        {[5, 4, 3, 2, 1].map((n) => (
-          <option key={n} value={n}>
-            {n} Star{n > 1 ? "s" : ""}
-          </option>
+      <div className="flex items-center gap-1 mb-2">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            type="button"
+            key={star}
+            onClick={() => setRating(star)}
+            className={`text-3xl focus:outline-none transition-colors ${
+              rating >= star ? "text-yellow-400" : "text-slate-200 hover:text-yellow-200"
+            }`}
+          >
+            ★
+          </button>
         ))}
-      </select>
+      </div>
 
       <textarea
         value={feedback}

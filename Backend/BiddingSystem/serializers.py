@@ -21,6 +21,18 @@ class BidCreateSerializer(serializers.ModelSerializer):
         if Bid.objects.filter(project=project, contractor=user).exists():
             raise serializers.ValidationError("You have already submitted a bid for this project.")
 
+        proposed_price = attrs.get("proposed_price")
+        if proposed_price is not None and proposed_price < 0:
+            raise serializers.ValidationError({"proposed_price": "Bid amount cannot be negative."})
+            
+        proposed_days = attrs.get("proposed_days")
+        if proposed_days is not None and proposed_days <= 0:
+            raise serializers.ValidationError({"proposed_days": "Proposed days must be at least 1."})
+            
+        daily_rate = attrs.get("daily_rate")
+        if daily_rate is not None and daily_rate < 0:
+            raise serializers.ValidationError({"daily_rate": "Daily rate cannot be negative."})
+
         return attrs
 
     def create(self, validated_data):

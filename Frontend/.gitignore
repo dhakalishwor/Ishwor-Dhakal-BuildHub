@@ -52,3 +52,22 @@ build/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+
+# Django
+db.sqlite3
+media/
+
+# Environment
+venv/
+.env
+
+# VSCode
+.vscode/
+
+# Node
+node_modules/
+dist/

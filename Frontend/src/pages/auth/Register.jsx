@@ -54,6 +54,12 @@ const Register = () => {
       return;
     }
 
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passwordRegex.test(formData.password)) {
+      setError("Password must be at least 8 characters long and include an uppercase letter, lowercase letter, number, and special character.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -66,23 +72,20 @@ const Register = () => {
 
       setSuccess("Account created successfully!");
 
-      const user = res.data.user;
-      const requiresUpload = Boolean(res.data.requires_license_upload);
+      const userId = res.data?.user?.id || res.data?.id;
 
-      if (user.role === "contractor") {
-        localStorage.setItem(
-          "pendingContractorId",
-          String(user.id)
-        );
-      }
-
-      setTimeout(() => {
-        if (requiresUpload && user.role === "contractor") {
-          navigate("/contractor/upload-license");
-        } else {
-          navigate("/login");
+      if (formData.role === "contractor") {
+        if (userId) {
+          localStorage.setItem("pendingContractorId", String(userId));
         }
-      }, 800);
+        setTimeout(() => {
+          window.location.href = "/contractor/upload-license";
+        }, 800);
+      } else {
+        setTimeout(() => {
+          navigate("/login");
+        }, 800);
+      }
     } catch (err) {
       setError(extractErrorMessage(err));
     } finally {

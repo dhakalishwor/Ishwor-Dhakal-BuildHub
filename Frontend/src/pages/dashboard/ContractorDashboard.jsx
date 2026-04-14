@@ -1270,23 +1270,7 @@ export default function ContractorDashboard() {
                                         </>
                                       )}
                                       
-                                      {t.status === "PENDING" && (
-                                        <>
-                                          <button
-                                            onClick={() => handleAcceptTask(t.id)}
-                                            className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-                                          >
-                                            Accept
-                                          </button>
-                                          
-                                          <button
-                                            onClick={() => handleRejectTask(t.id)}
-                                            className="px-3 py-1 rounded-lg text-xs font-bold bg-red-100 text-red-700 hover:bg-red-200"
-                                          >
-                                            Reject
-                                          </button>
-                                        </>
-                                      )}
+                                      {/* Removed erroneous contractor Accept/Reject on PENDING tasks */}
                                       
                                       {/* Universal actions available for all statuses */}
                                       <button
