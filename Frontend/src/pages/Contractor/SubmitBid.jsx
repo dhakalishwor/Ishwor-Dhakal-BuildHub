@@ -48,6 +48,9 @@ export default function SubmitBid({ projectId, onSuccess }) {
       <h3 className="font-bold text-lg mb-3">Submit a Bid</h3>
 
       <input
+        type="number"
+        min="0"
+        step="0.01"
         className="w-full border p-2 rounded mb-2"
         placeholder="Proposed Price"
         value={proposed_price}
@@ -56,6 +59,8 @@ export default function SubmitBid({ projectId, onSuccess }) {
       />
 
       <input
+        type="number"
+        min="1"
         className="w-full border p-2 rounded mb-2"
         placeholder="Proposed Days"
         value={proposed_days}

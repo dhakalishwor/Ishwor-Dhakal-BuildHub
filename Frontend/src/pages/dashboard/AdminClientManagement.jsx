@@ -53,9 +53,16 @@ export default function AdminClientManagement() {
     const next = {};
     if (!payload.username.trim()) next.username = "Username is required.";
     if (!payload.email.trim() || !isValidEmail(payload.email)) next.email = "Valid email is required.";
-    if (!editingClientId && (!payload.password || payload.password.length < 6)) {
-      next.password = "Password must be at least 6 characters.";
+    
+    if (!editingClientId && !payload.password) {
+      next.password = "Password is required.";
+    } else if (payload.password) {
+      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+      if (!passwordRegex.test(payload.password)) {
+        next.password = "Password must be at least 8 characters long and include an uppercase, lowercase, number, and special character.";
+      }
     }
+    
     return next;
   };
 

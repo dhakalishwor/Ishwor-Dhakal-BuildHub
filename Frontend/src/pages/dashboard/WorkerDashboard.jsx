@@ -200,6 +200,8 @@ export default function WorkerDashboard() {
     };
     load();
   }, [
+    activeMenu,
+    fetchJobs, fetchPayments, fetchWorkLogs, fetchMilestones,
     fetchMyBids, fetchSubJobApps, fetchAssignments, fetchTasks,
     fetchProgressUpdates, fetchProfile, fetchRecentConversations
   ]);
@@ -535,6 +537,8 @@ export default function WorkerDashboard() {
                     <label className="text-xs font-bold text-slate-500 uppercase">Total Proposed Price (NPR)</label>
                     <input
                       type="number"
+                      min="0"
+                      step="0.01"
                       required
                       value={bidForm.price}
                       onChange={(e) => setBidForm({ ...bidForm, price: e.target.value })}
@@ -546,6 +550,7 @@ export default function WorkerDashboard() {
                     <label className="text-xs font-bold text-slate-500 uppercase">Proposed Duration (Days)</label>
                     <input
                       type="number"
+                      min="1"
                       required
                       value={bidForm.days}
                       onChange={(e) => setBidForm({ ...bidForm, days: e.target.value })}
@@ -560,6 +565,8 @@ export default function WorkerDashboard() {
                     <label className="text-xs font-bold text-slate-500 uppercase">Daily Rate (NPR)</label>
                     <input
                       type="number"
+                      min="0"
+                      step="0.01"
                       required
                       value={bidForm.dailyRate}
                       onChange={(e) => setBidForm({ ...bidForm, dailyRate: e.target.value })}
