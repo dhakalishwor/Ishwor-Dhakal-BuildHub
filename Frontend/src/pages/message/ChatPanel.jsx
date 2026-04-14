@@ -56,11 +56,22 @@ export default function ChatPanel({ initialConversation = null }) {
     }, []);
 
     const buildWsUrl = useCallback((convId) => {
-        const isHttps = window.location.protocol === "https:";
-        const wsScheme = isHttps ? "wss" : "ws";
-        const host = window.location.hostname + ":8000";
-        return `${wsScheme}://${host}/ws/chat/${convId}/?token=${accessToken}`;
-    }, [accessToken]);
+    const explicitWsBase = import.meta.env.VITE_WS_BASE_URL;
+
+    if (explicitWsBase) {
+        return `${explicitWsBase}/ws/chat/${convId}/?token=${accessToken}`;
+    }
+
+    const isLocalhost =
+        window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1";
+
+    if (isLocalhost) {
+        return `ws://127.0.0.1:8000/ws/chat/${convId}/?token=${accessToken}`;
+    }
+
+    return `wss://dhakalishwor17.pythonanywhere.com/ws/chat/${convId}/?token=${accessToken}`;
+}, [accessToken]);
 
     const connect = useCallback((convId) => {
         if (!convId || !accessToken) return;
